@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* Design tokens from the approved prototype: ivory paper, navy ink, gold accent,
+   and one calm colour per result (green / amber / red). */
+@theme {
+  --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-sans:
+    "Instrument Sans Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+
+  --color-paper: #f6f3ec;
+  --color-ink: #14213d;
+  --color-muted: #4b5162;
+  --color-line: #b9b4a6;
+  --color-rule: #dad4c4;
+  --color-track: #e6e1d3;
+  --color-gold: #e2b65a;
+  --color-gold-ink: #8a6413;
+  --color-on-dark: #d8dce6;
+
+  --color-ok: #14523a;
+  --color-ok-soft: #e4eee7;
+  --color-warn: #8a4b08;
+  --color-bad: #9b1c1c;
+  --color-bad-soft: #fbdada;
+  --color-warn-soft: #fbe9d0;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    /* Keeps the page from bouncing sideways on phones. */
+    overflow-x: hidden;
+  }
+
+  /* A visible keyboard focus everywhere; ink on paper, white on dark surfaces. */
+  :focus-visible {
+    outline: 3px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  .on-dark :focus-visible {
+    outline-color: #ffffff;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* The line that sweeps the camera view. Held still for people who ask for less motion. */
+@keyframes scan-sweep {
+  0%,
+  100% {
+    top: 8%;
+  }
+  50% {
+    top: 92%;
+  }
+}
+
+.scan-line {
+  animation: scan-sweep 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-line {
+    animation: none;
+    top: 50%;
+  }
+}

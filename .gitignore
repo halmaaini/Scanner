@@ -1,0 +1,41 @@
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+
+# dependencies
+node_modules
+
+# environment (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# tests
+coverage
+playwright-report
+test-results
+e2e/.tmp
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Replit
+.cache/
+.local/

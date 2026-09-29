@@ -1,0 +1,9 @@
+# Generated or machine-managed: never hand-format.
+pnpm-lock.yaml
+lib/api-zod/src/generated
+lib/api-client-react/src/generated
+lib/db/migrations
+dist
+coverage
+playwright-report
+test-results

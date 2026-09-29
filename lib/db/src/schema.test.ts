@@ -1,0 +1,184 @@
+import path from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+// Needs a scratch Postgres: TEST_DATABASE_URL=postgres://... pnpm --filter @workspace/db test
+const testUrl = process.env.TEST_DATABASE_URL;
+const migrationsFolder = path.resolve(import.meta.dirname, "../migrations");
+
+type Db = typeof import("./index");
+type Testing = typeof import("./testing");
+
+describe.skipIf(!testUrl)("database schema (needs TEST_DATABASE_URL)", () => {
+  let pool: Db["pool"];
+  let runMigrations: Db["runMigrations"];
+  let resetDatabase: Testing["resetDatabase"];
+  let clearData: Testing["clearData"];
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = testUrl;
+    ({ pool, runMigrations } = await import("./index"));
+    ({ resetDatabase, clearData } = await import("./testing"));
+    await resetDatabase(migrationsFolder);
+  });
+
+  beforeEach(async () => {
+    await clearData();
+  });
+
+  afterAll(async () => {
+    await pool?.end();
+  });
+
+  const sql = (text: string, params: unknown[] = []) =>
+    pool.query(text, params);
+
+  const addStudent = (id = "1001", name = "Layla Hassan") =>
+    sql("insert into students (student_id, full_name) values ($1, $2)", [
+      id,
+      name,
+    ]);
+  const addEvent = (id = "graduation") =>
+    sql("insert into events (id, name) values ($1, $2)", [id, "Graduation"]);
+  const addStaff = (username = "sara", role = "admin") =>
+    sql(
+      `insert into staff (username, password_hash, display_name, role)
+       values ($1, crypt('pw', gen_salt('bf', 4)), 'Sara', $2) returning id`,
+      [username, role],
+    );
+
+  it("applies migrations repeatedly and concurrently without error", async () => {
+    await runMigrations(migrationsFolder);
+    await Promise.all([
+      runMigrations(migrationsFolder),
+      runMigrations(migrationsFolder),
+      runMigrations(migrationsFolder),
+    ]);
+    const { rows } = await sql(
+      "select count(*)::int as n from drizzle.__drizzle_migrations",
+    );
+    expect(rows[0].n).toBe(2);
+  });
+
+  it("hashes and verifies passwords with pgcrypto", async () => {
+    await addStaff("sara");
+    const good = await sql(
+      "select password_hash = crypt($1, password_hash) as ok from staff",
+      ["pw"],
+    );
+    const bad = await sql(
+      "select password_hash = crypt($1, password_hash) as ok from staff",
+      ["nope"],
+    );
+    expect(good.rows[0].ok).toBe(true);
+    expect(bad.rows[0].ok).toBe(false);
+  });
+
+  it("keeps usernames unique regardless of case", async () => {
+    await addStaff("Sara");
+    await expect(addStaff("sara")).rejects.toThrow(/staff_username_lower_key/);
+  });
+
+  it("only allows the known staff roles", async () => {
+    await expect(addStaff("root", "root")).rejects.toThrow(/staff_role_check/);
+    await expect(addStaff("boss", "super")).resolves.toBeDefined();
+  });
+
+  it("rejects student IDs that could never be matched", async () => {
+    await expect(addStudent("10 01")).rejects.toThrow(
+      /students_student_id_check/,
+    );
+    await expect(addStudent(" 1001")).rejects.toThrow(
+      /students_student_id_check/,
+    );
+    await expect(addStudent("")).rejects.toThrow(/students_student_id_check/);
+    await expect(addStudent("1001", "  ")).rejects.toThrow(
+      /students_full_name_check/,
+    );
+    await expect(addStudent("2021-04517")).resolves.toBeDefined();
+  });
+
+  it("requires event ids to be lowercase slugs", async () => {
+    await expect(addEvent("Graduation")).rejects.toThrow(/events_id_check/);
+    await expect(addEvent("grad day")).rejects.toThrow(/events_id_check/);
+    await expect(addEvent("graduation-2026")).resolves.toBeDefined();
+  });
+
+  it("never allows half a check-in", async () => {
+    await addStudent();
+    await addEvent();
+    const staff = await addStaff();
+    const staffId = staff.rows[0].id;
+    await sql(
+      "insert into registrations (student_id, event_id) values ('1001', 'graduation')",
+    );
+    await expect(
+      sql("update registrations set checked_in_at = now()"),
+    ).rejects.toThrow(/registrations_check_in_pair_check/);
+    await expect(
+      sql("update registrations set checked_in_by = $1", [staffId]),
+    ).rejects.toThrow(/registrations_check_in_pair_check/);
+    await sql(
+      "update registrations set checked_in_at = now(), checked_in_by = $1",
+      [staffId],
+    );
+    await sql(
+      "update registrations set checked_in_at = null, checked_in_by = null",
+    );
+  });
+
+  it("registers a student for an event only once", async () => {
+    await addStudent();
+    await addEvent();
+    await sql(
+      "insert into registrations (student_id, event_id) values ('1001', 'graduation')",
+    );
+    await expect(
+      sql(
+        "insert into registrations (student_id, event_id) values ('1001', 'graduation')",
+      ),
+    ).rejects.toThrow(/registrations_student_id_event_id_pk/);
+  });
+
+  it("cascades student and event deletes and follows ID corrections", async () => {
+    await addStudent("1001");
+    await addStudent("1002");
+    await addEvent();
+    await sql(
+      "insert into registrations (student_id, event_id) values ('1001', 'graduation'), ('1002', 'graduation')",
+    );
+
+    await sql(
+      "update students set student_id = '9001' where student_id = '1001'",
+    );
+    const moved = await sql("select student_id from registrations order by 1");
+    expect(moved.rows.map((r) => r.student_id)).toEqual(["1002", "9001"]);
+
+    await sql("delete from students where student_id = '9001'");
+    expect((await sql("select 1 from registrations")).rowCount).toBe(1);
+    await sql("delete from events");
+    expect((await sql("select 1 from registrations")).rowCount).toBe(0);
+  });
+
+  it("refuses to delete staff who have checked people in", async () => {
+    await addStudent();
+    await addEvent();
+    const staff = await addStaff();
+    await sql(
+      "insert into registrations (student_id, event_id, checked_in_at, checked_in_by) values ('1001', 'graduation', now(), $1)",
+      [staff.rows[0].id],
+    );
+    await expect(sql("delete from staff")).rejects.toThrow(
+      /registrations_checked_in_by_staff_id_fk/,
+    );
+  });
+
+  it("refuses to run destructive helpers against a non-test database", async () => {
+    const original = process.env.TEST_DATABASE_URL;
+    process.env.TEST_DATABASE_URL = "postgres://elsewhere/db";
+    try {
+      await expect(clearData()).rejects.toThrow(/Refusing/);
+    } finally {
+      process.env.TEST_DATABASE_URL = original;
+    }
+  });
+});

@@ -1,0 +1,487 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: >
+    Attendance scanner API. This file is the single source of truth for the
+    HTTP contract: the server validates requests and responses with the Zod
+    schemas generated from it, and the web app calls the generated client.
+    Staff endpoints need the session cookie set by POST /auth/login; the card
+    endpoint is public.
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Staff sign-in and session
+  - name: roster
+    description: The dataset a scanner works from
+  - name: scans
+    description: Submitting scans (online or replayed after being offline)
+  - name: check-ins
+    description: Correcting check-ins
+  - name: cards
+    description: Public attendee cards
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Sign in
+      description: >
+        Checks the username and password against the staff table and starts a
+        session. Wrong credentials and deactivated accounts return the same
+        401 so accounts cannot be probed. Failed attempts are rate limited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Sign out
+      description: Ends the current session. Safe to call when not signed in.
+      responses:
+        "204":
+          description: Signed out
+  /auth/me:
+    get:
+      operationId: getCurrentStaff
+      tags: [auth]
+      summary: Current staff member
+      description: Returns the signed-in staff member, or 401 when the session is missing, expired or the account was deactivated.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The signed-in staff member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /roster:
+    get:
+      operationId: getRoster
+      tags: [roster]
+      summary: Everything a scanner needs
+      description: >
+        The complete dataset for scanning and reporting: events, students,
+        which students are registered for which event (and whether they have
+        checked in), and the staff names those check-ins point at. It is small
+        by design (hundreds of students) and every screen derives its numbers
+        from it, so counts and lists can never disagree. Scanners keep a copy
+        so they keep working offline.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The roster
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Roster"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /scans:
+    post:
+      operationId: submitScans
+      tags: [scans]
+      summary: Submit scans
+      description: >
+        Records one or more scans made by the signed-in staff member, in
+        order. Each scan is judged independently and gets its own result;
+        a scan that cannot be recorded (unknown student, revoked, ...) is a
+        normal 200 result, not an HTTP error. Safe to replay: a scan for a
+        student who is already checked in returns `already_checked_in` and
+        changes nothing, so an offline scanner can resend its queue until it
+        gets an answer. `scannedAt` is when the scan physically happened
+        (kept for the check-in time; clamped so it is never in the future).
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanBatch"
+      responses:
+        "200":
+          description: One result per scan, in the same order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanBatchResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /check-ins/{eventId}/{studentId}:
+    delete:
+      operationId: undoCheckIn
+      tags: [check-ins]
+      summary: Undo a check-in
+      description: >
+        Clears a student's check-in for an event, leaving them registered.
+        Admins can undo check-ins they made themselves; the super admin can
+        undo any. Undoing a check-in that is already clear succeeds and
+        changes nothing.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/EventIdPath"
+        - $ref: "#/components/parameters/StudentIdPath"
+      responses:
+        "200":
+          description: The registration after the undo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registration"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cards/{studentId}:
+    get:
+      operationId: getCard
+      tags: [cards]
+      summary: Attendee card
+      description: >
+        Public. Returns a student's name and, for each event they are
+        registered for, whether they have checked in. The student ID is the
+        only key, by design; requests are rate limited per client.
+      parameters:
+        - $ref: "#/components/parameters/StudentIdPath"
+      responses:
+        "200":
+          description: The card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Session cookie set by POST /auth/login.
+  parameters:
+    EventIdPath:
+      name: eventId
+      in: path
+      required: true
+      description: Event id (a short slug such as `graduation`).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    StudentIdPath:
+      name: studentId
+      in: path
+      required: true
+      description: Student ID exactly as printed on the card.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+  responses:
+    BadRequest:
+      description: The request body or parameters are invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Unauthorized:
+      description: Not signed in, or the session is no longer valid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Forbidden:
+      description: Signed in, but not allowed to do this
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    NotFound:
+      description: No such record
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    TooManyRequests:
+      description: Rate limit exceeded; try again later
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable message.
+    LoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 100
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+    StaffRole:
+      type: string
+      enum: [admin, super]
+      description: >
+        `admin` scans and can undo their own check-ins. `super` can also undo
+        anyone's check-in and open the attendance report.
+    Staff:
+      type: object
+      required: [id, username, displayName, role]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          $ref: "#/components/schemas/StaffRole"
+    SessionResult:
+      type: object
+      required: [staff]
+      properties:
+        staff:
+          $ref: "#/components/schemas/Staff"
+    StaffRef:
+      type: object
+      description: Just enough about a staff member to show who checked someone in.
+      required: [id, displayName]
+      properties:
+        id:
+          type: integer
+        displayName:
+          type: string
+    Event:
+      type: object
+      required: [id, name, sortOrder, isOpen]
+      properties:
+        id:
+          type: string
+          description: Short slug, e.g. `rehearsal`.
+        name:
+          type: string
+        sortOrder:
+          type: integer
+        isOpen:
+          type: boolean
+          description: Scanners only offer open events.
+    Student:
+      type: object
+      required: [studentId, fullName, isActive]
+      properties:
+        studentId:
+          type: string
+        fullName:
+          type: string
+        isActive:
+          type: boolean
+          description: False once the student's access has been revoked.
+    Registration:
+      type: object
+      description: >
+        A student's place on an event's list. It is also the attendance
+        record: `checkedInAt` and `checkedInBy` are both null until the
+        student checks in.
+      required: [studentId, eventId, checkedInAt, checkedInBy]
+      properties:
+        studentId:
+          type: string
+        eventId:
+          type: string
+        checkedInAt:
+          type: [string, "null"]
+          format: date-time
+        checkedInBy:
+          type: [integer, "null"]
+          description: Id of the staff member who checked the student in.
+    Roster:
+      type: object
+      required: [events, students, registrations, staff]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+        students:
+          type: array
+          items:
+            $ref: "#/components/schemas/Student"
+        registrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Registration"
+        staff:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffRef"
+    Scan:
+      type: object
+      required: [id, studentId, eventId, scannedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client-generated id; lets a scanner match results to its queue.
+        studentId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        eventId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        scannedAt:
+          type: string
+          format: date-time
+    ScanBatch:
+      type: object
+      required: [scans]
+      properties:
+        scans:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/Scan"
+    ScanOutcome:
+      type: string
+      enum:
+        - checked_in
+        - already_checked_in
+        - unknown_student
+        - unknown_event
+        - not_registered
+        - revoked
+      description: >
+        `checked_in`: recorded now. `already_checked_in`: nothing changed, the
+        student had already checked in (see `registration`). `unknown_student`:
+        no such student ID. `unknown_event`: no such event. `not_registered`:
+        the student exists but is not on this event's list. `revoked`: the
+        student's access was revoked.
+    ScanResult:
+      type: object
+      required: [id, outcome, studentId, eventId, student, registration]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The id of the scan this result answers.
+        outcome:
+          $ref: "#/components/schemas/ScanOutcome"
+        studentId:
+          type: string
+          description: The normalised student ID that was looked up.
+        eventId:
+          type: string
+        student:
+          description: Null when the student ID is unknown.
+          anyOf:
+            - $ref: "#/components/schemas/Student"
+            - type: "null"
+        registration:
+          description: >
+            The registration after the scan. Present for `checked_in` and
+            `already_checked_in`; null otherwise.
+          anyOf:
+            - $ref: "#/components/schemas/Registration"
+            - type: "null"
+    ScanBatchResult:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanResult"
+    CardEvent:
+      type: object
+      required: [id, name, sortOrder, checkedInAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sortOrder:
+          type: integer
+        checkedInAt:
+          type: [string, "null"]
+          format: date-time
+    Card:
+      type: object
+      required: [studentId, fullName, isActive, events]
+      properties:
+        studentId:
+          type: string
+        fullName:
+          type: string
+        isActive:
+          type: boolean
+        events:
+          type: array
+          description: Only the events this student is registered for, in event order.
+          items:
+            $ref: "#/components/schemas/CardEvent"
