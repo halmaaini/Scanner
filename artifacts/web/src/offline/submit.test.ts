@@ -179,6 +179,46 @@ describe("submitScan", () => {
 });
 
 describe("submitUndo", () => {
+  it("takes back a scan that never left this device instead of undoing it", async () => {
+    const { deps, scan, outbox, api } = setup({
+      ...offline,
+      undoCheckIn: async () => {
+        throw networkError();
+      },
+    });
+    const response = await scan("1002");
+    expect(response).toMatchObject({ kind: "offline" });
+
+    const undone = await submitUndo(deps, {
+      studentId: "1002",
+      eventId: "graduation",
+      staffId: 2,
+      scanOpId: (response as { opId: string }).opId,
+    });
+
+    // As far as the server will ever know, it never happened.
+    expect(undone).toEqual({ kind: "done", registration: null });
+    expect(outbox.getState().ops).toEqual([]);
+    expect(api.undoCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("still sends an undo when the scan it corrects already reached the server", async () => {
+    const { deps, scan, outbox, api } = setup();
+    const response = await scan("1002");
+    expect(response).toMatchObject({ kind: "answered" });
+
+    const undone = await submitUndo(deps, {
+      studentId: "1002",
+      eventId: "graduation",
+      staffId: 2,
+      scanOpId: (response as { opId: string }).opId,
+    });
+
+    expect(undone).toEqual({ kind: "done", registration: cleared("1002") });
+    expect(api.undoCheckIn).toHaveBeenCalledTimes(1);
+    expect(outbox.getState().ops).toEqual([]);
+  });
+
   it("undoes through the server when it can", async () => {
     const { deps } = setup();
     expect(

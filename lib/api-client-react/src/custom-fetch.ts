@@ -17,6 +17,7 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _timeoutMs: number | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +43,41 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Give up on any request that has not finished (headers and body) after this
+ * many milliseconds, so a hanging connection fails instead of waiting for
+ * ever. Pass `null` for no limit. A caller's own `signal` still applies.
+ */
+export function setRequestTimeout(ms: number | null): void {
+  _timeoutMs = ms;
+}
+
+/**
+ * A signal that aborts when `signal` does or after `ms`, whichever is first.
+ * Call `cleanup` once the request is over.
+ */
+export function abortAfter(
+  ms: number,
+  signal?: AbortSignal | null,
+): { signal: AbortSignal; cleanup: () => void } {
+  const controller = new AbortController();
+  const abort = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abort();
+  else signal?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(
+    () =>
+      controller.abort(new DOMException("Request timed out", "TimeoutError")),
+    ms,
+  );
+  return {
+    signal: controller.signal,
+    cleanup() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    },
+  };
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -337,7 +373,10 @@ export async function customFetch<T = unknown>(
   options: CustomFetchOptions = {},
 ): Promise<T> {
   input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  // Every success answer of this API is JSON (or empty), so anything else,
+  // such as a proxy's or a Wi-Fi login page's HTML, is refused as unreadable
+  // instead of being handed to the app as if it were data.
+  const { responseType = "json", headers: headersInit, ...init } = options;
 
   const method = resolveMethod(input, init.method);
 
@@ -373,12 +412,25 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const limited =
+    _timeoutMs === null
+      ? { signal: init.signal ?? undefined, cleanup() {} }
+      : abortAfter(_timeoutMs, init.signal);
+  try {
+    const response = await fetch(input, {
+      ...init,
+      method,
+      headers,
+      signal: limited.signal,
+    });
 
-  if (!response.ok) {
-    const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
+    if (!response.ok) {
+      const errorData = await parseErrorBody(response, method);
+      throw new ApiError(response, errorData, requestInfo);
+    }
+
+    return (await parseSuccessBody(response, responseType, requestInfo)) as T;
+  } finally {
+    limited.cleanup();
   }
-
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
 }

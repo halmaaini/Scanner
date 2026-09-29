@@ -20,5 +20,6 @@ export interface Scan {
      * @maxLength 64
      */
   eventId: string;
-  scannedAt: Date;
+  /** When the scan physically happened, in UTC (ISO 8601, e.g. `2026-06-11T10:42:00.000Z`). */
+  scannedAt: string;
 }

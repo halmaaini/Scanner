@@ -40,6 +40,9 @@ function subscribe(listener: () => void): () => void {
 
 const getSnapshot = () => browserOnline() && reachable;
 
+/** The same answer as `useOnline`, for code that is not a component. */
+export const isOnline = getSnapshot;
+
 export function useOnline(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, () => true);
 }

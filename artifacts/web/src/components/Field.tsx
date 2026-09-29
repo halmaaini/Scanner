@@ -1,7 +1,7 @@
-import { useId, type InputHTMLAttributes } from "react";
+import { useId, type ComponentProps } from "react";
 import { cn } from "@/lib/cn";
 
-interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
+interface FieldProps extends ComponentProps<"input"> {
   label: string;
   /** Keep the label for screen readers but do not show it. */
   hideLabel?: boolean;
@@ -32,7 +32,7 @@ export function Field({
         {...input}
         id={inputId}
         className={cn(
-          "w-full min-w-0 rounded-xl border-[1.5px] border-line bg-white px-4 text-ink placeholder:text-muted/70",
+          "w-full min-w-0 rounded-xl border-[1.5px] border-line bg-surface px-4 text-ink placeholder:text-muted",
           scale === "lg" ? "h-14 text-lg" : "h-[52px] text-[17px]",
           className,
         )}

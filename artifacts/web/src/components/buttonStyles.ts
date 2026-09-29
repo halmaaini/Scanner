@@ -11,7 +11,7 @@ const base =
  * order, not by the order written).
  */
 export const buttonStyles = {
-  primary: `${base} bg-ink text-white hover:bg-[#1f2f52]`,
+  primary: `${base} bg-ink text-white hover:bg-ink-hover`,
   outline: `${base} border-2 border-ink text-ink hover:bg-ink/5`,
   /** White button on a coloured result screen; the caller adds the text colour. */
   onTone: `${base} h-[60px] w-full rounded-[14px] bg-white text-lg`,

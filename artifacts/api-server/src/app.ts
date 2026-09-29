@@ -10,6 +10,7 @@ import {
   LOGIN_RATE_LIMIT,
   SESSION_COOKIE_NAME,
   SESSION_IDLE_TIMEOUT_MS,
+  TRUST_PROXY_HOPS,
   isProduction,
   type RateLimit,
 } from "./config";
@@ -22,6 +23,9 @@ export interface AppOptions {
   /** Override the defaults in config.ts (tests use this). */
   loginRateLimit?: RateLimit;
   cardRateLimit?: RateLimit;
+  trustProxyHops?: number;
+  /** Mark the session cookie `Secure` (HTTPS only). Default: in production. */
+  secureCookies?: boolean;
 }
 
 function sessionSecret(): string {
@@ -45,8 +49,8 @@ export function createApp(options: AppOptions = {}): Express {
   const app: Express = express();
 
   // Behind Replit's proxy: needed so `secure` cookies are set over the proxied
-  // HTTPS connection and so rate limits see the client's address.
-  app.set("trust proxy", 1);
+  // HTTPS connection and so rate limits see the client's address (see config.ts).
+  app.set("trust proxy", options.trustProxyHops ?? TRUST_PROXY_HOPS);
 
   app.use(
     pinoHttp({
@@ -67,7 +71,8 @@ export function createApp(options: AppOptions = {}): Express {
   );
   app.use(helmet());
   app.use(compression());
-  // 500 scans is well under 200 KB; anything bigger is not a real request.
+  // A full batch of scans (MAX_SCANS_PER_REQUEST) is a few dozen KB; anything
+  // near this limit is not a real request.
   app.use(express.json({ limit: "1mb" }));
 
   const PgStore = connectPgSimple(session);
@@ -86,7 +91,7 @@ export function createApp(options: AppOptions = {}): Express {
         httpOnly: true,
         // Lax keeps the cookie off cross-site POST/DELETE requests (CSRF).
         sameSite: "lax",
-        secure: isProduction,
+        secure: options.secureCookies ?? isProduction,
         maxAge: SESSION_IDLE_TIMEOUT_MS,
       },
     }),

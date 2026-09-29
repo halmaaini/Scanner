@@ -9,7 +9,7 @@
     "jsx": "react-jsx",
     "lib": ["esnext", "dom", "dom.iterable"],
     "moduleResolution": "bundler",
-    "types": ["node", "vite/client"],
+    "types": ["node", "vite/client", "vite-plugin-pwa/react"],
     "paths": {
       "@/*": ["./src/*"]
     }

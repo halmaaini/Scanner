@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   addStaff,
   createClient,
@@ -32,6 +32,43 @@ describeWithDb("auth", () => {
     const me = await client.get("/api/auth/me");
     expect(me.status).toBe(200);
     expect(me.body.staff.username).toBe("sara");
+  });
+
+  it("accepts a password with non-ASCII characters hashed by pgcrypto", async () => {
+    const password =
+      String.fromCodePoint(0x0643, 0x0644, 0x0645, 0x0629) + "-1";
+    await addStaff("sara", { password });
+    const res = await createClient()
+      .post("/api/auth/login")
+      .send({ username: "sara", password });
+    expect(res.status).toBe(200);
+  });
+
+  // The password is compared in the API, never sent to Postgres, so no query
+  // parameter, driver error or database log can ever contain it.
+  it("never sends a password to the database", async () => {
+    await addStaff("sara", { password: "correct horse battery staple" });
+    const { pool } = await import("@workspace/db");
+    const spy = vi.spyOn(pool, "query");
+    try {
+      const attempts = [
+        ["sara", "correct horse battery staple"],
+        ["sara", "wrong horse battery staple"],
+        ["nobody", "another secret phrase"],
+      ] as const;
+      for (const [username, password] of attempts) {
+        await createClient()
+          .post("/api/auth/login")
+          .send({ username, password });
+      }
+
+      // The spy does see queries (the users and the sessions), just not the secrets.
+      expect(spy.mock.calls.length).toBeGreaterThan(3);
+      const sent = JSON.stringify(spy.mock.calls);
+      for (const [, password] of attempts) expect(sent).not.toContain(password);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("ignores username case and surrounding spaces", async () => {

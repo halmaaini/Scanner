@@ -83,7 +83,7 @@ export const GetRosterResponse = zod.object({
   "registrations": zod.array(zod.object({
   "studentId": zod.string(),
   "eventId": zod.string(),
-  "checkedInAt": zod.coerce.date().nullable(),
+  "checkedInAt": zod.iso.datetime({"offset":true}).nullable().describe('When the student checked in (UTC, ISO 8601); null until then.'),
   "checkedInBy": zod.int().nullable().describe('Id of the staff member who checked the student in.')
 }).describe('A student\'s place on an event\'s list. It is also the attendance record: `checkedInAt` and `checkedInBy` are both null until the student checks in.\n')),
   "staff": zod.array(zod.object({
@@ -94,7 +94,7 @@ export const GetRosterResponse = zod.object({
 
 
 /**
- * Records one or more scans made by the signed-in staff member, in order. Each scan is judged independently and gets its own result; a scan that cannot be recorded (unknown student, revoked, ...) is a normal 200 result, not an HTTP error. Safe to replay: a scan for a student who is already checked in returns `already_checked_in` and changes nothing, so an offline scanner can resend its queue until it gets an answer. `scannedAt` is when the scan physically happened (kept for the check-in time; clamped so it is never in the future).
+ * Records one or more scans made by the signed-in staff member, in order. Each scan is judged independently and gets its own result; a scan that cannot be recorded (unknown student, revoked, ...) is a normal 200 result, not an HTTP error. Safe to retry after a lost response: a scan for a student who is already checked in returns `already_checked_in` and changes nothing, so an offline scanner can resend its queue until it gets an answer. That is decided by the student's state, not by the scan `id`: if someone undoes the check-in in between, a retry checks the student in again. `scannedAt` is when the scan physically happened, in UTC (kept for the check-in time; clamped so it is never in the future).
  * @summary Submit scans
  */
 export const submitScansBodyScansItemStudentIdMax = 64;
@@ -110,7 +110,7 @@ export const SubmitScansBody = zod.object({
   "id": zod.uuid().describe('Client-generated id; lets a scanner match results to its queue.'),
   "studentId": zod.string().min(1).max(submitScansBodyScansItemStudentIdMax),
   "eventId": zod.string().min(1).max(submitScansBodyScansItemEventIdMax),
-  "scannedAt": zod.coerce.date()
+  "scannedAt": zod.iso.datetime({"offset":true}).describe('When the scan physically happened, in UTC (ISO 8601, e.g. `2026-06-11T10:42:00.000Z`).\n')
 })).min(1).max(submitScansBodyScansMax)
 })
 
@@ -128,7 +128,7 @@ export const SubmitScansResponse = zod.object({
   "registration": zod.union([zod.object({
   "studentId": zod.string(),
   "eventId": zod.string(),
-  "checkedInAt": zod.coerce.date().nullable(),
+  "checkedInAt": zod.iso.datetime({"offset":true}).nullable().describe('When the student checked in (UTC, ISO 8601); null until then.'),
   "checkedInBy": zod.int().nullable().describe('Id of the staff member who checked the student in.')
 }).describe('A student\'s place on an event\'s list. It is also the attendance record: `checkedInAt` and `checkedInBy` are both null until the student checks in.\n'),zod.null()]).describe('The registration after the scan. Present for `checked_in` and `already_checked_in`; null otherwise.\n')
 }))
@@ -153,7 +153,7 @@ export const UndoCheckInParams = zod.object({
 export const UndoCheckInResponse = zod.object({
   "studentId": zod.string(),
   "eventId": zod.string(),
-  "checkedInAt": zod.coerce.date().nullable(),
+  "checkedInAt": zod.iso.datetime({"offset":true}).nullable().describe('When the student checked in (UTC, ISO 8601); null until then.'),
   "checkedInBy": zod.int().nullable().describe('Id of the staff member who checked the student in.')
 }).describe('A student\'s place on an event\'s list. It is also the attendance record: `checkedInAt` and `checkedInBy` are both null until the student checks in.\n')
 
@@ -178,7 +178,7 @@ export const GetCardResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "sortOrder": zod.int(),
-  "checkedInAt": zod.coerce.date().nullable()
+  "checkedInAt": zod.iso.datetime({"offset":true}).nullable().describe('When the student checked in (UTC, ISO 8601); null until then.')
 })).describe('Only the events this student is registered for, in event order.')
 })
 

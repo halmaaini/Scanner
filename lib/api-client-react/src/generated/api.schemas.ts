@@ -80,7 +80,10 @@ export interface Student {
 export interface Registration {
   studentId: string;
   eventId: string;
-  /** @nullable */
+  /**
+     * When the student checked in (UTC, ISO 8601); null until then.
+     * @nullable
+     */
   checkedInAt: string | null;
   /**
      * Id of the staff member who checked the student in.
@@ -109,6 +112,7 @@ export interface Scan {
      * @maxLength 64
      */
   eventId: string;
+  /** When the scan physically happened, in UTC (ISO 8601, e.g. `2026-06-11T10:42:00.000Z`). */
   scannedAt: string;
 }
 
@@ -156,7 +160,10 @@ export interface CardEvent {
   id: string;
   name: string;
   sortOrder: number;
-  /** @nullable */
+  /**
+     * When the student checked in (UTC, ISO 8601); null until then.
+     * @nullable
+     */
   checkedInAt: string | null;
 }
 
@@ -187,6 +194,11 @@ export type ForbiddenResponse = ErrorBody;
  * No such record
  */
 export type NotFoundResponse = ErrorBody;
+
+/**
+ * The request body is larger than the server accepts
+ */
+export type PayloadTooLargeResponse = ErrorBody;
 
 /**
  * Rate limit exceeded; try again later

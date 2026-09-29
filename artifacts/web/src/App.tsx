@@ -1,6 +1,7 @@
 import { Redirect, Route, Router, Switch } from "wouter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Splash } from "@/components/Splash";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { CardPage } from "@/features/card/CardPage";
 import { LookupPage } from "@/features/card/LookupPage";
 import { LoginPage } from "@/features/auth/LoginPage";
@@ -25,6 +26,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 export function App() {
   return (
     <ErrorBoundary>
+      <UpdatePrompt />
       <Router base={base}>
         <Switch>
           <Route path="/" component={Home} />

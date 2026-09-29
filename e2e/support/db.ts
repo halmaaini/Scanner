@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
+import { selectTestDatabase } from "@workspace/db/test-database";
 import { SEED_FILE } from "./env";
 
 // @workspace/db reads DATABASE_URL when it is first imported, so the scratch
 // database is selected first and the import is deferred until it is needed.
 async function load() {
-  const url = process.env.TEST_DATABASE_URL;
-  if (!url)
+  if (!selectTestDatabase()) {
     throw new Error("TEST_DATABASE_URL must point at a scratch database.");
-  process.env.DATABASE_URL = url;
+  }
   const { pool } = await import("@workspace/db");
   const { clearData } = await import("@workspace/db/testing");
   return { pool, clearData };

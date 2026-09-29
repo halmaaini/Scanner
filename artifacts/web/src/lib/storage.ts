@@ -16,34 +16,35 @@ export function createMemoryStorage(): KeyValueStore {
 }
 
 /**
- * localStorage that never throws. Private windows, blocked site data and a
- * full disk all make the real thing throw; the app then keeps working from
- * memory (it just cannot survive a reload).
+ * Wraps a browser store so it never throws. Private windows, blocked site data
+ * and a full disk all make the real thing throw; a value that could not be
+ * saved then lives in memory instead (it just cannot survive a reload), and
+ * reads keep returning the newest value, wherever it went.
  */
-function createSafeStorage(): KeyValueStore {
-  const fallback = createMemoryStorage();
-  const real = (() => {
-    try {
-      return window.localStorage;
-    } catch {
-      return null;
-    }
-  })();
+export function createSafeStorage(real: KeyValueStore | null): KeyValueStore {
+  const memory = createMemoryStorage();
+  /** Keys whose newest value is only in memory, because the real store refused it. */
+  const inMemory = new Set<string>();
 
   return {
     getItem(key) {
+      if (inMemory.has(key)) return memory.getItem(key);
       try {
-        return real ? real.getItem(key) : fallback.getItem(key);
+        return real ? real.getItem(key) : memory.getItem(key);
       } catch {
-        return fallback.getItem(key);
+        return memory.getItem(key);
       }
     },
     setItem(key, value) {
       try {
         if (!real) throw new Error("no storage");
         real.setItem(key, value);
+        // The real store has the newest value again.
+        inMemory.delete(key);
+        memory.removeItem(key);
       } catch {
-        fallback.setItem(key, value);
+        inMemory.add(key);
+        memory.setItem(key, value);
       }
     },
     removeItem(key) {
@@ -52,9 +53,18 @@ function createSafeStorage(): KeyValueStore {
       } catch {
         // nothing to do
       }
-      fallback.removeItem(key);
+      inMemory.delete(key);
+      memory.removeItem(key);
     },
   };
 }
 
-export const appStorage: KeyValueStore = createSafeStorage();
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export const appStorage: KeyValueStore = createSafeStorage(browserStorage());

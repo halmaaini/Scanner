@@ -1,3 +1,7 @@
+import {
+  MAX_STUDENT_ID_LENGTH,
+  STUDENT_ID_FORBIDDEN_PATTERN,
+} from "@workspace/attendance";
 import { sql } from "drizzle-orm";
 import { boolean, check, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
@@ -17,9 +21,15 @@ export const studentsTable = pgTable(
       .defaultNow(),
   },
   (t) => [
-    // IDs are matched exactly, so an ID with stray spaces could never be
-    // scanned or typed. Refuse it at import time instead.
-    check("students_student_id_check", sql`${t.studentId} ~ '^\\S+$'`),
+    // Every scan, typed ID and card link is cleaned by `normalizeStudentId`
+    // and then matched exactly, so an ID it would change (spaces, Arabic
+    // digits, hidden marks) could never be found. Refuse those at import time.
+    // The rule is built from the same text the normalizer uses; a database
+    // test checks the two agree for every character.
+    check(
+      "students_student_id_check",
+      sql`char_length(${t.studentId}) between 1 and ${sql.raw(String(MAX_STUDENT_ID_LENGTH))} and ${t.studentId} is nfkc normalized and ${t.studentId} !~ ${sql.raw(`'${STUDENT_ID_FORBIDDEN_PATTERN}'`)}`,
+    ),
     check("students_full_name_check", sql`btrim(${t.fullName}) <> ''`),
   ],
 );

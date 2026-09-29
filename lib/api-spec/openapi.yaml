@@ -125,11 +125,14 @@ paths:
         Records one or more scans made by the signed-in staff member, in
         order. Each scan is judged independently and gets its own result;
         a scan that cannot be recorded (unknown student, revoked, ...) is a
-        normal 200 result, not an HTTP error. Safe to replay: a scan for a
-        student who is already checked in returns `already_checked_in` and
-        changes nothing, so an offline scanner can resend its queue until it
-        gets an answer. `scannedAt` is when the scan physically happened
-        (kept for the check-in time; clamped so it is never in the future).
+        normal 200 result, not an HTTP error. Safe to retry after a lost
+        response: a scan for a student who is already checked in returns
+        `already_checked_in` and changes nothing, so an offline scanner can
+        resend its queue until it gets an answer. That is decided by the
+        student's state, not by the scan `id`: if someone undoes the check-in
+        in between, a retry checks the student in again. `scannedAt` is when
+        the scan physically happened, in UTC (kept for the check-in time;
+        clamped so it is never in the future).
       security:
         - sessionCookie: []
       requestBody:
@@ -149,6 +152,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
   /check-ins/{eventId}/{studentId}:
     delete:
       operationId: undoCheckIn
@@ -171,6 +176,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Registration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -195,6 +202,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Card"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -246,6 +255,12 @@ components:
             $ref: "#/components/schemas/ErrorBody"
     NotFound:
       description: No such record
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    PayloadTooLarge:
+      description: The request body is larger than the server accepts
       content:
         application/json:
           schema:
@@ -355,6 +370,7 @@ components:
         checkedInAt:
           type: [string, "null"]
           format: date-time
+          description: When the student checked in (UTC, ISO 8601); null until then.
         checkedInBy:
           type: [integer, "null"]
           description: Id of the staff member who checked the student in.
@@ -397,6 +413,9 @@ components:
         scannedAt:
           type: string
           format: date-time
+          description: >
+            When the scan physically happened, in UTC (ISO 8601, e.g.
+            `2026-06-11T10:42:00.000Z`).
     ScanBatch:
       type: object
       required: [scans]
@@ -470,6 +489,7 @@ components:
         checkedInAt:
           type: [string, "null"]
           format: date-time
+          description: When the student checked in (UTC, ISO 8601); null until then.
     Card:
       type: object
       required: [studentId, fullName, isActive, events]

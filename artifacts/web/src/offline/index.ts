@@ -1,29 +1,31 @@
 import {
+  abortAfter,
   getGetCurrentStaffQueryKey,
   getGetRosterQueryKey,
   submitScans,
   undoCheckIn,
   type Roster,
 } from "@workspace/api-client-react";
-import { REQUEST_TIMEOUT_MS, STORAGE_KEYS } from "@/config";
+import { SCAN_TIMEOUT_MS, STORAGE_KEYS } from "@/config";
 import { replaceRegistrations } from "@/domain/roster";
-import { reportReachable } from "@/lib/network";
+import { isOnline, reportReachable } from "@/lib/network";
 import { queryClient } from "@/lib/queryClient";
 import { appStorage } from "@/lib/storage";
+import { exclusiveAcrossTabs } from "./lock";
 import { createOutbox } from "./outbox";
 import { submitScan, submitUndo, type ScanInput } from "./submit";
 import { createSyncEngine } from "./sync";
 
-/** A request that hangs (a weak signal) is treated as "no connection". */
-async function withTimeout<T>(
-  run: (signal: AbortSignal) => Promise<T>,
+/** A scan or undo slower than SCAN_TIMEOUT_MS is treated as "no connection". */
+async function bounded<T>(
+  signal: AbortSignal,
+  request: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const limited = abortAfter(SCAN_TIMEOUT_MS, signal);
   try {
-    return await run(controller.signal);
+    return await request(limited.signal);
   } finally {
-    clearTimeout(timer);
+    limited.cleanup();
   }
 }
 
@@ -33,25 +35,33 @@ export const outbox = createOutbox(appStorage, STORAGE_KEYS.outbox);
 export const syncEngine = createSyncEngine({
   outbox,
   api: {
-    submitScans: async (scans) =>
-      (await withTimeout((signal) => submitScans({ scans }, { signal })))
-        .results,
+    submitScans: async (scans, signal) =>
+      (
+        await bounded(signal, (limited) =>
+          submitScans({ scans }, { signal: limited }),
+        )
+      ).results,
     // The generated URL builders do not escape path parameters; IDs may contain "/".
-    undoCheckIn: (eventId, studentId) =>
-      withTimeout((signal) =>
+    undoCheckIn: (eventId, studentId, signal) =>
+      bounded(signal, (limited) =>
         undoCheckIn(
           encodeURIComponent(eventId),
           encodeURIComponent(studentId),
-          { signal },
+          { signal: limited },
         ),
       ),
   },
   hooks: {
-    onRegistrations: (registrations) =>
+    onRegistrations: async (registrations) => {
+      const key = getGetRosterQueryKey();
+      // A roster read that began before these answers came back would land
+      // after them and put the old rows back; call it off first.
+      await queryClient.cancelQueries({ queryKey: key });
       queryClient.setQueryData<Roster>(
-        getGetRosterQueryKey(),
+        key,
         (roster) => roster && replaceRegistrations(roster, registrations),
-      ),
+      );
+    },
     onStale: () =>
       void queryClient.invalidateQueries({ queryKey: getGetRosterQueryKey() }),
     onUnauthorized: () =>
@@ -60,11 +70,17 @@ export const syncEngine = createSyncEngine({
       }),
     onReachable: reportReachable,
   },
+  isReachable: isOnline,
+  exclusive: exclusiveAcrossTabs,
 });
 
 /** What screens call to write: every scan and undo goes through here. */
 export const scanning = {
   scan: (input: ScanInput) => submitScan({ outbox, engine: syncEngine }, input),
-  undo: (input: { studentId: string; eventId: string; staffId: number }) =>
-    submitUndo({ outbox, engine: syncEngine }, input),
+  undo: (input: {
+    studentId: string;
+    eventId: string;
+    staffId: number;
+    scanOpId?: string;
+  }) => submitUndo({ outbox, engine: syncEngine }, input),
 };

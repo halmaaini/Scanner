@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateScan, type ScanFacts } from "./scan";
+import { evaluateScan, isRecorded, type ScanFacts } from "./scan";
 
 const event = { id: "graduation" };
 const active = { isActive: true };
@@ -42,5 +42,23 @@ describe("evaluateScan", () => {
   it("rejects a student who is not on the event's list", () => {
     expect(judge({ registration: null })).toBe("not_registered");
     expect(judge({ registration: undefined })).toBe("not_registered");
+  });
+});
+
+describe("isRecorded", () => {
+  it("is true for the two outcomes that leave the student checked in", () => {
+    expect(isRecorded("checked_in")).toBe(true);
+    expect(isRecorded("already_checked_in")).toBe(true);
+  });
+
+  it("is false for every outcome that does not", () => {
+    for (const outcome of [
+      "unknown_student",
+      "unknown_event",
+      "not_registered",
+      "revoked",
+    ] as const) {
+      expect(isRecorded(outcome)).toBe(false);
+    }
   });
 });

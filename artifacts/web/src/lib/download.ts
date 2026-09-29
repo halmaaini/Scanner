@@ -14,5 +14,10 @@ export function downloadTextFile(
   document.body.append(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Some browsers start the download after this function returns; letting go
+  // of the file at once would cancel it.
+  setTimeout(() => URL.revokeObjectURL(url), RELEASE_DOWNLOAD_MS);
 }
+
+/** How long a downloaded file is kept available to the browser before it is released. */
+const RELEASE_DOWNLOAD_MS = 60_000;

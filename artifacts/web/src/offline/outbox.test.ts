@@ -43,39 +43,95 @@ describe("outbox", () => {
     expect(outbox.getState().issues).toEqual([issue]);
   });
 
-  it("dismisses issues without touching waiting changes", () => {
+  it("dismisses one person's issues without touching waiting changes or anyone else's", () => {
     const outbox = createOutbox(createMemoryStorage(), KEY);
     const a = scanOp("1001");
     outbox.add(a);
-    outbox.settle([], [{ op: scanOp("1002"), reason: "revoked", at: "x" }]);
-    outbox.dismissIssues();
-    expect(outbox.getState()).toEqual({ ops: [a], issues: [] });
+    const mine = { op: scanOp("1002"), reason: "revoked" as const, at: "x" };
+    const theirs = {
+      op: scanOp("1003", "graduation", { staffId: 3 }),
+      reason: "revoked" as const,
+      at: "y",
+    };
+    outbox.settle([], [mine, theirs]);
+
+    outbox.dismissIssues(2);
+
+    expect(outbox.getState()).toEqual({ ops: [a], issues: [theirs] });
   });
 
-  it("clears everything and leaves nothing behind in storage", () => {
+  it("leaves nothing behind in storage once everything is settled", () => {
     const storage = createMemoryStorage();
     const outbox = createOutbox(storage, KEY);
-    outbox.add(scanOp("1001"));
-    outbox.clear();
+    const op = scanOp("1001");
+    outbox.add(op);
+    expect(storage.getItem(KEY)).not.toBeNull();
+    outbox.settle([op.id]);
     expect(outbox.getState()).toEqual({ ops: [], issues: [] });
     expect(storage.getItem(KEY)).toBeNull();
   });
 
-  it("ignores damaged saved data instead of crashing", () => {
+  it("ignores damaged saved data instead of crashing, but keeps a copy", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const storage = createMemoryStorage();
     storage.setItem(KEY, "{not json");
     expect(createOutbox(storage, KEY).getState().ops).toEqual([]);
+    expect(storage.getItem(`${KEY}.unreadable`)).toBe("{not json");
+    warn.mockRestore();
+  });
 
-    storage.setItem(
-      KEY,
-      JSON.stringify({
-        ops: [{ type: "scan" }, "nope", scanOp("1001")],
-        issues: [{ reason: 1 }],
-      }),
-    );
+  it("drops entries it cannot understand, keeping a copy of what was saved", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const storage = createMemoryStorage();
+    const raw = JSON.stringify({
+      version: 1,
+      ops: [{ type: "scan" }, "nope", scanOp("1001")],
+      issues: [{ reason: 1 }],
+    });
+    storage.setItem(KEY, raw);
+
     const state = createOutbox(storage, KEY).getState();
+
     expect(state.ops.map((o) => o.studentId)).toEqual(["1001"]);
     expect(state.issues).toEqual([]);
+    expect(storage.getItem(`${KEY}.unreadable`)).toBe(raw);
+    warn.mockRestore();
+  });
+
+  it("does not throw away changes saved in a format it does not know", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const storage = createMemoryStorage();
+    const raw = JSON.stringify({ version: 99, ops: [scanOp("1001")] });
+    storage.setItem(KEY, raw);
+
+    const outbox = createOutbox(storage, KEY);
+    outbox.add(scanOp("1002")); // writes over the main entry...
+
+    expect(storage.getItem(`${KEY}.unreadable`)).toBe(raw); // ...but the old data is kept
+    warn.mockRestore();
+  });
+
+  it("writes the format version with the data", () => {
+    const storage = createMemoryStorage();
+    createOutbox(storage, KEY).add(scanOp("1001"));
+    expect(JSON.parse(storage.getItem(KEY)!)).toMatchObject({ version: 1 });
+  });
+
+  it("picks up what another tab wrote when asked to refresh, and only then tells anyone", () => {
+    const storage = createMemoryStorage();
+    const tabA = createOutbox(storage, KEY);
+    const tabB = createOutbox(storage, KEY);
+    const listener = vi.fn();
+    tabA.subscribe(listener);
+
+    tabA.refresh();
+    expect(listener).not.toHaveBeenCalled(); // nothing changed
+
+    tabB.add(scanOp("1001"));
+    expect(tabA.getState().ops).toEqual([]);
+    tabA.refresh();
+    expect(tabA.getState().ops.map((o) => o.studentId)).toEqual(["1001"]);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("tells subscribers about changes and hands out the same state until one happens", () => {

@@ -32,6 +32,7 @@ import type {
   HealthStatus,
   LoginInput,
   NotFoundResponse,
+  PayloadTooLargeResponse,
   Registration,
   Roster,
   ScanBatch,
@@ -547,7 +548,7 @@ export const getSubmitScansUrl = () => {
 }
 
 /**
- * Records one or more scans made by the signed-in staff member, in order. Each scan is judged independently and gets its own result; a scan that cannot be recorded (unknown student, revoked, ...) is a normal 200 result, not an HTTP error. Safe to replay: a scan for a student who is already checked in returns `already_checked_in` and changes nothing, so an offline scanner can resend its queue until it gets an answer. `scannedAt` is when the scan physically happened (kept for the check-in time; clamped so it is never in the future).
+ * Records one or more scans made by the signed-in staff member, in order. Each scan is judged independently and gets its own result; a scan that cannot be recorded (unknown student, revoked, ...) is a normal 200 result, not an HTTP error. Safe to retry after a lost response: a scan for a student who is already checked in returns `already_checked_in` and changes nothing, so an offline scanner can resend its queue until it gets an answer. That is decided by the student's state, not by the scan `id`: if someone undoes the check-in in between, a retry checks the student in again. `scannedAt` is when the scan physically happened, in UTC (kept for the check-in time; clamped so it is never in the future).
  * @summary Submit scans
  */
 export const submitScans = async (scanBatch: ScanBatch, options?: Parameters<typeof customFetch>[1]): Promise<ScanBatchResult> => {
@@ -581,7 +582,7 @@ return customFetch<ScanBatchResult>(getSubmitScansUrl(),
 
 export const getSubmitScansMutationKey = () => ['submitScans'] as const;
 
-export const getSubmitScansMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+export const getSubmitScansMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | PayloadTooLargeResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitScans>>, TError,SubmitScansMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof submitScans>>, TError,SubmitScansMutationVariables, TContext> => {
 
@@ -610,13 +611,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SubmitScansMutationResult = NonNullable<Awaited<ReturnType<typeof submitScans>>>
     export type SubmitScansMutationBody = BodyType<ScanBatch>
-    export type SubmitScansMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse>
+    export type SubmitScansMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | PayloadTooLargeResponse>
     export type SubmitScansMutationVariables = {data: BodyType<ScanBatch>}
 
     /**
  * @summary Submit scans
  */
-export const useSubmitScans = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse>,
+export const useSubmitScans = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | PayloadTooLargeResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitScans>>, TError,SubmitScansMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof submitScans>>,
@@ -658,7 +659,7 @@ export const undoCheckIn = async (eventId: string,
 
 export const getUndoCheckInMutationKey = () => ['undoCheckIn'] as const;
 
-export const getUndoCheckInMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+export const getUndoCheckInMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoCheckIn>>, TError,UndoCheckInMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof undoCheckIn>>, TError,UndoCheckInMutationVariables, TContext> => {
 
@@ -687,13 +688,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UndoCheckInMutationResult = NonNullable<Awaited<ReturnType<typeof undoCheckIn>>>
 
-    export type UndoCheckInMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type UndoCheckInMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
     export type UndoCheckInMutationVariables = {eventId: string;studentId: string}
 
     /**
  * @summary Undo a check-in
  */
-export const useUndoCheckIn = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+export const useUndoCheckIn = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoCheckIn>>, TError,UndoCheckInMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof undoCheckIn>>,
@@ -738,7 +739,7 @@ export const getGetCardQueryKey = (studentId: string,) => {
     }
 
 
-export const getGetCardQueryOptions = <TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<NotFoundResponse | TooManyRequestsResponse>>(studentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCard>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getGetCardQueryOptions = <TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse>>(studentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCard>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -757,10 +758,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetCardQueryResult = NonNullable<Awaited<ReturnType<typeof getCard>>>
-export type GetCardQueryError = ErrorType<NotFoundResponse | TooManyRequestsResponse>
+export type GetCardQueryError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse>
 
 
-export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<NotFoundResponse | TooManyRequestsResponse>>(
+export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse>>(
  studentId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCard>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCard>>,
@@ -770,7 +771,7 @@ export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError =
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<NotFoundResponse | TooManyRequestsResponse>>(
+export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse>>(
  studentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCard>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCard>>,
@@ -780,7 +781,7 @@ export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError =
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<NotFoundResponse | TooManyRequestsResponse>>(
+export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse>>(
  studentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCard>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -788,7 +789,7 @@ export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError =
  * @summary Attendee card
  */
 
-export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<NotFoundResponse | TooManyRequestsResponse>>(
+export function useGetCard<TData = Awaited<ReturnType<typeof getCard>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse>>(
  studentId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCard>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

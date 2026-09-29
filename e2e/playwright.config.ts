@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { assertScratchDatabase } from "@workspace/db/test-database";
 import { API_PORT, REPO_ROOT, WEB_PORT, browserArgs } from "./support/env";
 
 // End-to-end tests: a real browser drives the built app against a real API and
@@ -14,6 +15,7 @@ if (!testDatabase) {
     "TEST_DATABASE_URL must point at a scratch Postgres database (it is wiped).",
   );
 }
+assertScratchDatabase(testDatabase);
 
 export default defineConfig({
   testDir: "./tests",

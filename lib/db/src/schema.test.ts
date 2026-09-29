@@ -1,9 +1,19 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
+import { normalizeStudentId } from "@workspace/attendance";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { selectTestDatabase } from "./test-database";
 
 // Needs a scratch Postgres: TEST_DATABASE_URL=postgres://... pnpm --filter @workspace/db test
-const testUrl = process.env.TEST_DATABASE_URL;
+const testUrl = selectTestDatabase();
 const migrationsFolder = path.resolve(import.meta.dirname, "../migrations");
+const migrationCount = (
+  JSON.parse(
+    readFileSync(path.join(migrationsFolder, "meta/_journal.json"), "utf8"),
+  ) as { entries: unknown[] }
+).entries.length;
+
+const char = String.fromCodePoint;
 
 type Db = typeof import("./index");
 type Testing = typeof import("./testing");
@@ -15,7 +25,6 @@ describe.skipIf(!testUrl)("database schema (needs TEST_DATABASE_URL)", () => {
   let clearData: Testing["clearData"];
 
   beforeAll(async () => {
-    process.env.DATABASE_URL = testUrl;
     ({ pool, runMigrations } = await import("./index"));
     ({ resetDatabase, clearData } = await import("./testing"));
     await resetDatabase(migrationsFolder);
@@ -56,10 +65,10 @@ describe.skipIf(!testUrl)("database schema (needs TEST_DATABASE_URL)", () => {
     const { rows } = await sql(
       "select count(*)::int as n from drizzle.__drizzle_migrations",
     );
-    expect(rows[0].n).toBe(2);
+    expect(rows[0].n).toBe(migrationCount);
   });
 
-  it("hashes and verifies passwords with pgcrypto", async () => {
+  it("hashes passwords with pgcrypto, the way the SQL cookbook creates accounts", async () => {
     await addStaff("sara");
     const good = await sql(
       "select password_hash = crypt($1, password_hash) as ok from staff",
@@ -84,17 +93,67 @@ describe.skipIf(!testUrl)("database schema (needs TEST_DATABASE_URL)", () => {
   });
 
   it("rejects student IDs that could never be matched", async () => {
-    await expect(addStudent("10 01")).rejects.toThrow(
-      /students_student_id_check/,
-    );
-    await expect(addStudent(" 1001")).rejects.toThrow(
-      /students_student_id_check/,
-    );
-    await expect(addStudent("")).rejects.toThrow(/students_student_id_check/);
+    const rejected = [
+      "10 01",
+      " 1001",
+      "",
+      `10${char(0x200f)}01`, // hidden right-to-left mark
+      `10${char(0x061c)}01`, // Arabic letter mark
+      char(0x0661, 0x0660, 0x0660, 0x0661), // Arabic-Indic digits
+      char(0xff11, 0xff10, 0xff10, 0xff11), // full-width digits
+      "1".repeat(65), // longer than any ID the API accepts
+    ];
+    for (const id of rejected) {
+      await expect(addStudent(id), JSON.stringify(id)).rejects.toThrow(
+        /students_student_id_check/,
+      );
+    }
     await expect(addStudent("1001", "  ")).rejects.toThrow(
       /students_full_name_check/,
     );
     await expect(addStudent("2021-04517")).resolves.toBeDefined();
+    await expect(addStudent("CS/2021/045")).resolves.toBeDefined();
+    await expect(addStudent("1".repeat(64))).resolves.toBeDefined();
+  });
+
+  // The scanner cleans every ID with normalizeStudentId before matching it
+  // exactly, so the database may store an ID only if that function would leave
+  // it alone. Checked with the real constraint, for every character.
+  it("stores exactly the IDs that normalizeStudentId leaves unchanged", async () => {
+    const { rows } = await sql(
+      `select pg_get_expr(conbin, conrelid) as rule from pg_constraint
+       where conname = 'students_student_id_check'`,
+    );
+    const accepted = await sql(
+      `select code from
+         (select code from generate_series(1, 65535) as code
+          where code not between 55296 and 57343) as codes,
+         lateral (select 'A' || chr(code) || '1' as student_id) as candidate
+       where ${rows[0].rule}`,
+    );
+    const inDatabase = new Set(accepted.rows.map((row) => row.code));
+
+    const disagreements: string[] = [];
+    const newerThanPostgres: string[] = [];
+    for (let code = 1; code <= 0xffff; code++) {
+      if (code >= 0xd800 && code <= 0xdfff) continue;
+      const id = `A${char(code)}1`;
+      const unchanged = normalizeStudentId(id) === id;
+      if (unchanged === inDatabase.has(code)) continue;
+
+      const name = `U+${code.toString(16).padStart(4, "0")}`;
+      // Node's Unicode tables can be a release ahead of Postgres's, so a
+      // character added lately may be folded by Node but still stored. Any other
+      // difference is a real mismatch between the rule and the constraint.
+      if (inDatabase.has(code) && id.normalize("NFKC") !== id) {
+        newerThanPostgres.push(name);
+      } else {
+        disagreements.push(name);
+      }
+    }
+    expect(disagreements).toEqual([]);
+    // If the constraint forgot NFKC altogether this would be in the hundreds.
+    expect(newerThanPostgres.length).toBeLessThan(10);
   });
 
   it("requires event ids to be lowercase slugs", async () => {

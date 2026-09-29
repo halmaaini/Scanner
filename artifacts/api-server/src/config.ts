@@ -5,6 +5,27 @@
 
 export const isProduction = process.env.NODE_ENV === "production";
 
+/**
+ * How many proxies sit between the internet and this server (Replit's edge is
+ * one). Express reads the visitor's address, and whether the request was
+ * HTTPS, from what the last of them put in X-Forwarded-*. Too low and every
+ * visitor looks like the proxy, so they share one rate limit; too high and a
+ * visitor can invent their own address. Set TRUST_PROXY_HOPS to change it.
+ */
+function trustProxyHops(): number {
+  const raw = process.env.TRUST_PROXY_HOPS;
+  if (raw === undefined || raw === "") return 1;
+  const hops = Number(raw);
+  if (!Number.isInteger(hops) || hops < 0) {
+    throw new Error(
+      `TRUST_PROXY_HOPS must be a whole number of proxies (0 or more), got "${raw}".`,
+    );
+  }
+  return hops;
+}
+
+export const TRUST_PROXY_HOPS = trustProxyHops();
+
 export const SESSION_COOKIE_NAME = "sid";
 
 /** A staff session ends after this long without any request (it slides). */

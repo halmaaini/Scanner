@@ -1,4 +1,10 @@
-import { expect, signIn, test } from "../support";
+import {
+  STORAGE_KEYS,
+  expect,
+  signIn,
+  test,
+  waitForSavedCopy,
+} from "../support";
 
 test.describe("signing in", () => {
   test("rejects a wrong password and stays on the sign-in page", async ({
@@ -53,5 +59,32 @@ test.describe("signing in", () => {
     await expect(
       page.getByRole("heading", { name: "Attendance" }),
     ).toBeVisible();
+  });
+
+  test("wipes what the phone saved when signing out: no student list, no unsent changes", async ({
+    page,
+  }) => {
+    await signIn(page, "sara");
+    await waitForSavedCopy(page, "/api/roster");
+    const saved = () =>
+      page.evaluate(
+        (key) => localStorage.getItem(key) ?? "",
+        STORAGE_KEYS.queryCache,
+      );
+    // Sanity: the phone does hold the names right now.
+    expect(await saved()).toContain("Layla Hassan");
+
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+
+    // The saved copy is rewritten a moment after the change.
+    await expect.poll(saved).not.toContain("Layla Hassan");
+    expect(await saved()).not.toContain("/api/roster");
+    expect(
+      await page.evaluate(
+        (key) => localStorage.getItem(key),
+        STORAGE_KEYS.outbox,
+      ),
+    ).toBeNull();
   });
 });

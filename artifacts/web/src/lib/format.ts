@@ -30,6 +30,11 @@ export function formatWhen(iso: string, now: Date = new Date()): string {
 
 const two = (n: number) => String(n).padStart(2, "0");
 
+/** "2026-06-11": the calendar day on this device, for file names. */
+export function formatDay(date: Date = new Date()): string {
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`;
+}
+
 /**
  * "2026-06-11 12:14:00" in this device's time zone: the shape spreadsheets
  * read as a date and time (an ISO string with a "Z" they leave as text).

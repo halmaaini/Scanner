@@ -40,7 +40,7 @@ CREATE TABLE "students" (
 	"full_name" text NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "students_student_id_check" CHECK ("students"."student_id" ~ '^\S+$'),
+	CONSTRAINT "students_student_id_check" CHECK (char_length("students"."student_id") between 1 and 64 and "students"."student_id" is nfkc normalized and "students"."student_id" !~ '[\u0009-\u000d\u0020\u0085\u00a0\u00ad\u061c\u1680\u180e\u2000-\u200f\u2028-\u202f\u205f-\u206f\u3000\ufeff\u0660-\u0669\u06f0-\u06f9]'),
 	CONSTRAINT "students_full_name_check" CHECK (btrim("students"."full_name") <> '')
 );
 --> statement-breakpoint

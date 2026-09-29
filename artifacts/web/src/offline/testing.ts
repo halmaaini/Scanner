@@ -88,23 +88,54 @@ export const cleared = (
   checkedInBy: null,
 });
 
+/** A promise settled from outside, for tests that decide when a request finishes. */
+export function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/** A request that never answers by itself, but fails when it is called off (as `fetch` does). */
+export const hangUntilAborted = <T>(signal: AbortSignal) =>
+  new Promise<T>((_resolve, reject) =>
+    signal.addEventListener("abort", () =>
+      reject(signal.reason ?? new Error("aborted")),
+    ),
+  );
+
 /**
  * A sync engine over an in-memory outbox and scripted server calls. By default
  * the server records every scan; override `submitScans` / `undoCheckIn` per test.
  */
-export function createTestSync(overrides: Partial<SyncApi> = {}) {
+export function createTestSync(
+  overrides: Partial<SyncApi> = {},
+  options: Pick<
+    Parameters<typeof createSyncEngine>[0],
+    "isReachable" | "exclusive"
+  > = {},
+) {
   const outbox = createOutbox(createMemoryStorage(), "test.outbox");
   const calls: string[] = [];
-  const api: SyncApi = {
-    submitScans: vi.fn(async (scans: Scan[]) => {
-      calls.push(`scans:${scans.map((s) => s.studentId).join(",")}`);
-      return scans.map((s) => recorded(s));
-    }),
-    undoCheckIn: vi.fn(async (eventId: string, studentId: string) => {
-      calls.push(`undo:${studentId}`);
-      return cleared(studentId, eventId);
-    }),
-    ...overrides,
+  // Always spies, so tests can count calls whether or not they script the server.
+  const api = {
+    submitScans: vi.fn<SyncApi["submitScans"]>(
+      overrides.submitScans ??
+        (async (scans) => {
+          calls.push(`scans:${scans.map((s) => s.studentId).join(",")}`);
+          return scans.map((s) => recorded(s));
+        }),
+    ),
+    undoCheckIn: vi.fn<SyncApi["undoCheckIn"]>(
+      overrides.undoCheckIn ??
+        (async (eventId, studentId) => {
+          calls.push(`undo:${studentId}`);
+          return cleared(studentId, eventId);
+        }),
+    ),
   };
   const hooks: SyncHooks = {
     onRegistrations: vi.fn(),
@@ -117,6 +148,7 @@ export function createTestSync(overrides: Partial<SyncApi> = {}) {
     api,
     hooks,
     now: () => new Date("2026-06-12T12:00:00.000Z"),
+    ...options,
   });
   return { outbox, engine, api, hooks, calls };
 }

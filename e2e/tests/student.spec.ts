@@ -1,4 +1,10 @@
-import { expect, registrationOf, sql, test } from "../support";
+import {
+  expect,
+  registrationOf,
+  sql,
+  test,
+  waitForSavedCopy,
+} from "../support";
 
 test.describe("the student's card", () => {
   test("opens from the ID and shows the QR and which events were attended", async ({
@@ -106,12 +112,7 @@ test.describe("the student's card", () => {
     await expect(
       page.getByRole("heading", { name: "Layla Hassan" }),
     ).toBeVisible();
-    await page.evaluate(() =>
-      navigator.serviceWorker.ready.then(() => undefined),
-    );
-    await page.waitForFunction(
-      () => localStorage.getItem("scanner.cache") !== null,
-    );
+    await waitForSavedCopy(page, "/api/cards/1001");
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "Layla Hassan" }),

@@ -12,6 +12,7 @@ import { Logo } from "@/components/Logo";
 import { Screen } from "@/components/Screen";
 import { statusOf } from "@/lib/errors";
 import { m } from "@/messages";
+import { useOutbox } from "@/offline/hooks";
 import { useStaff } from "./useStaff";
 
 /** Anything other than a clear "no" or "slow down" is treated as the server being out of reach. */
@@ -26,6 +27,8 @@ export function LoginPage() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [error, setError] = useState<string | null>(null);
+  // Check-ins saved on this phone that a session ending must not seem to have lost.
+  const saved = useOutbox().ops.length;
 
   const login = useLogin({
     mutation: {
@@ -61,6 +64,14 @@ export function LoginPage() {
           {m.login.heading[1]}
         </h1>
         <p className="text-base leading-normal text-muted">{m.login.intro}</p>
+        {saved > 0 && (
+          <p
+            role="status"
+            className="rounded-xl bg-warn-soft px-3.5 py-3 text-sm text-warn"
+          >
+            {m.login.savedChanges(saved)}
+          </p>
+        )}
       </header>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-5">

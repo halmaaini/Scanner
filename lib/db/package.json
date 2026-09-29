@@ -6,14 +6,15 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./test-database": "./src/test-database.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate --config ./drizzle.config.ts",
-    "migrate": "tsx ./src/migrate-cli.ts",
     "test": "vitest run"
   },
   "dependencies": {
+    "@workspace/attendance": "workspace:*",
     "drizzle-orm": "catalog:",
     "pg": "^8.20.0"
   },
@@ -21,7 +22,6 @@
     "@types/node": "catalog:",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
-    "tsx": "catalog:",
     "vitest": "catalog:"
   }
 }

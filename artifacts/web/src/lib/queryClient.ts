@@ -1,8 +1,19 @@
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import type { PersistQueryClientProviderProps } from "@tanstack/react-query-persist-client";
-import { getGetCurrentStaffQueryKey } from "@workspace/api-client-react";
-import { CACHE_MAX_AGE_MS, CACHE_VERSION, STORAGE_KEYS } from "@/config";
+import {
+  getGetCardQueryKey,
+  getGetCurrentStaffQueryKey,
+  getGetRosterQueryKey,
+} from "@workspace/api-client-react";
+import {
+  CACHE_MAX_AGE_MS,
+  CACHE_VERSION,
+  PERSIST_THROTTLE_MS,
+  QUERY_RETRIES,
+  QUERY_STALE_MS,
+  STORAGE_KEYS,
+} from "@/config";
 import { isNetworkError, isUnauthorized } from "./errors";
 import { reportReachable } from "./network";
 import { appStorage } from "./storage";
@@ -35,8 +46,8 @@ export const queryClient: QueryClient = new QueryClient({
       // Answer from the saved copy first and try the network in the background;
       // never wait for a connection that is not there.
       networkMode: "offlineFirst",
-      retry: 1,
-      staleTime: 10_000,
+      retry: QUERY_RETRIES,
+      staleTime: QUERY_STALE_MS,
       // Must outlive the persisted copy (see CACHE_MAX_AGE_MS).
       gcTime: CACHE_MAX_AGE_MS,
     },
@@ -46,17 +57,39 @@ export const queryClient: QueryClient = new QueryClient({
   },
 });
 
-export const persister = createSyncStoragePersister({
-  storage: appStorage,
+/** The (synchronous) app storage in the shape the persister expects. */
+const asyncStorage = {
+  getItem: async (key: string) => appStorage.getItem(key),
+  setItem: async (key: string, value: string) => appStorage.setItem(key, value),
+  removeItem: async (key: string) => appStorage.removeItem(key),
+};
+
+export const persister = createAsyncStoragePersister({
+  storage: asyncStorage,
   key: STORAGE_KEYS.queryCache,
-  throttleTime: 1_000,
+  throttleTime: PERSIST_THROTTLE_MS,
 });
 
 /**
- * Only what a device needs to keep working offline is saved: who is signed in
- * and the roster (staff), and a student's own card (attendees). Sign-out wipes it.
+ * Forgets everything saved from the server: who is signed in, the student
+ * list and cards. Unsent changes are not part of it (they live in the outbox).
  */
-const PERSISTED_PREFIXES = ["/api/auth/me", "/api/roster", "/api/cards/"];
+export function forgetSavedCopy(): void {
+  queryClient.clear();
+  void persister.removeClient();
+}
+
+/**
+ * Only what a device needs to keep working offline is saved: who is signed in
+ * and the roster (staff), and a student's own card (attendees). A query's key
+ * is its URL, taken from the generated client so a renamed endpoint cannot
+ * silently stop being saved; a card's key ends in the ID, hence "prefix".
+ */
+const PERSISTED_PREFIXES: readonly string[] = [
+  getGetCurrentStaffQueryKey()[0],
+  getGetRosterQueryKey()[0],
+  getGetCardQueryKey("")[0],
+];
 
 export const persistOptions: PersistQueryClientProviderProps["persistOptions"] =
   {

@@ -6,16 +6,19 @@ import { buttonStyles } from "@/components/buttonStyles";
 import { Field } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { m } from "@/messages";
+import { cardPath } from "./cardPath";
 
 /** Public: a student types their ID to open their card. */
 export function LookupPage() {
   const [, navigate] = useLocation();
   const [value, setValue] = useState("");
+  const [empty, setEmpty] = useState(false);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const studentId = normalizeStudentId(value);
-    if (studentId) navigate(`/card/${encodeURIComponent(studentId)}`);
+    setEmpty(!studentId);
+    if (studentId) navigate(cardPath(studentId));
   }
 
   return (
@@ -35,7 +38,10 @@ export function LookupPage() {
           label={m.lookup.studentId}
           scale="lg"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setEmpty(false);
+          }}
           inputMode="text"
           enterKeyHint="go"
           autoComplete="off"
@@ -44,6 +50,11 @@ export function LookupPage() {
           spellCheck={false}
           required
         />
+        {empty && (
+          <p role="alert" className="text-[15px] font-semibold text-bad">
+            {m.lookup.empty}
+          </p>
+        )}
         <Button type="submit" className="w-full">
           {m.lookup.submit}
         </Button>

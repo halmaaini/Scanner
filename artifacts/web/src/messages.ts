@@ -20,16 +20,25 @@ export const m = {
     back: "Back",
     signOut: "Sign out",
     dismiss: "Dismiss",
+    update: {
+      available: "A new version of the app is ready.",
+      reload: "Reload",
+    },
     crashed: {
       title: "Something went wrong",
       body: "Reload the page to carry on. Anything already saved on this device is safe.",
       reload: "Reload",
+      clearHint:
+        "Still stuck? Clear the saved student list and reload. Check-ins that have not been sent yet are kept.",
+      clearSaved: "Clear saved list and reload",
     },
   },
 
   login: {
     heading: ["Attendance", "check-in"],
     intro: "Sign in to check people in at events.",
+    savedChanges: (n: number) =>
+      `${n} ${plural(n, "check-in is", "check-ins are")} saved on this phone. ${plural(n, "It is", "They are")} sent when the person who made ${plural(n, "it", "them")} signs in.`,
     username: "Username",
     password: "Password",
     submit: "Sign in",
@@ -38,14 +47,29 @@ export const m = {
     tooManyAttempts: "Too many attempts. Wait a few minutes and try again.",
     unreachable: "Can't reach the server. Check your connection and try again.",
     accountsNote:
-      "Accounts are created by the super admin. Forgot your password? Ask them to reset it.",
+      "Accounts are set up by whoever runs this event. Forgot your password? Ask them to reset it.",
     studentLink: "I'm a graduate: view my card",
   },
 
   auth: {
-    /** Asked before signing out with changes that have not reached the server. */
-    confirmDiscard: (n: number) =>
-      `${n} ${plural(n, "change hasn't", "changes haven't")} been sent yet and will be lost if you sign out. Sign out anyway?`,
+    /**
+     * Asked before signing out with changes that have not reached the server,
+     * or that it refused and nobody has looked at yet.
+     */
+    confirmDiscard: (pending: number, problems: number) => {
+      const parts: string[] = [];
+      if (pending > 0) {
+        parts.push(
+          `${pending} ${plural(pending, "change hasn't", "changes haven't")} been sent yet`,
+        );
+      }
+      if (problems > 0) {
+        parts.push(
+          `${problems} ${plural(problems, "change", "changes")} couldn't be saved and ${plural(problems, "hasn't", "haven't")} been looked at`,
+        );
+      }
+      return `${parts.join(" and ")}. ${plural(pending + problems, "It", "They")} will be lost if you sign out. Sign out anyway?`;
+    },
     signOutFailed: "Couldn't sign out. Check your connection and try again.",
   },
 
@@ -63,6 +87,11 @@ export const m = {
     cameraDenied:
       "Camera access is blocked. Allow it in your browser settings, or type the ID below.",
     cameraUnavailable: "No camera found. Type the student ID below.",
+    cameraInsecure:
+      "The camera only works on secure (https) pages. Type the student ID below.",
+    checking: "Checking…",
+    eventReplaced: (was: string, now: string) =>
+      `“${was}” is no longer open. Now scanning for “${now}”.`,
     cameraError: "The camera could not start. Type the student ID below.",
     orType: "or type the student ID",
     studentId: "Student ID",
@@ -82,12 +111,15 @@ export const m = {
       waiting: (n: number) => `${n} waiting to sync`,
       syncing: "Syncing…",
       syncNow: "Sync now",
+      serverProblem:
+        "The server had a problem. Your check-ins are saved on this phone and will be sent when it is fixed.",
       othersWaiting: (n: number) =>
         `${n} ${plural(n, "change", "changes")} from another admin ${plural(n, "is", "are")} waiting on this phone. ${plural(n, "It is", "They are")} sent when that admin signs in.`,
     },
     issues: {
       title: (n: number) =>
         `${n} ${plural(n, "change", "changes")} couldn't be saved`,
+      more: (n: number) => `…and ${n} more`,
       scan: "Check-in",
       undo: "Undo",
       reasons: {
@@ -148,7 +180,8 @@ export const m = {
     },
     undone: (name: string) => `Check-in undone for ${name}.`,
     undoQueued: "Undo saved. It syncs when you're back online.",
-    undoFailed: "Couldn't undo. Try again.",
+    undoRefused:
+      "This can't be undone here: only the person who checked the student in, or the super admin, can.",
   },
 
   report: {
@@ -176,6 +209,7 @@ export const m = {
     intro:
       "Enter your student ID to see your card and which events you have attended.",
     studentId: "Student ID",
+    empty: "Enter your student ID.",
     submit: "Show my card",
     staffLink: "Staff sign in",
   },

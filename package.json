@@ -9,7 +9,8 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./e2e\" --if-present run typecheck",
     "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "check:generated": "pnpm --filter @workspace/scripts run check-generated"
   },
   "devDependencies": {
     "prettier": "^3.8.3",

@@ -1,5 +1,5 @@
 import type { ScanResult } from "@workspace/api-client-react";
-import { evaluateScan } from "@workspace/attendance";
+import { evaluateScan, isRecorded } from "@workspace/attendance";
 import type { ScanOp } from "./ops";
 import { indexRoster, type Roster } from "./roster";
 
@@ -20,7 +20,6 @@ export function predictScan(
 
   const outcome = evaluateScan({ event, student, registration });
 
-  const recorded = outcome === "checked_in" || outcome === "already_checked_in";
   return {
     id: scan.id,
     outcome,
@@ -34,7 +33,7 @@ export function predictScan(
             checkedInAt: scan.scannedAt,
             checkedInBy: scan.staffId,
           }
-        : recorded
+        : isRecorded(outcome)
           ? (registration ?? null)
           : null,
   };

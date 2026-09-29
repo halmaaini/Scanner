@@ -11,7 +11,7 @@ export function SyncStatus() {
   const staff = useCurrentStaff();
   const online = useOnline();
   const { ops } = useOutbox();
-  const { syncing } = useSyncStatus();
+  const { syncing, serverProblem } = useSyncStatus();
   // Changes are only ever sent by the person who made them.
   const waiting = ops.filter((op) => op.staffId === staff.id).length;
   const othersWaiting = ops.length - waiting;
@@ -41,7 +41,7 @@ export function SyncStatus() {
         <span className="font-semibold">
           {online ? m.scanner.sync.online : m.scanner.sync.offline}
         </span>
-        <span className="opacity-85">
+        <span>
           {syncing
             ? m.scanner.sync.syncing
             : waiting === 0
@@ -52,12 +52,20 @@ export function SyncStatus() {
           <button
             type="button"
             onClick={() => void syncEngine.flush(staff.id)}
-            className="ms-auto min-h-8 font-semibold underline underline-offset-2"
+            className="ms-auto inline-flex min-h-11 items-center px-2 font-semibold underline underline-offset-2"
           >
             {m.scanner.sync.syncNow}
           </button>
         )}
       </div>
+      {serverProblem && (
+        <p
+          role="status"
+          className="rounded-xl bg-warn-soft px-3.5 py-3 text-sm text-warn"
+        >
+          {m.scanner.sync.serverProblem}
+        </p>
+      )}
       {othersWaiting > 0 && (
         <p
           role="status"

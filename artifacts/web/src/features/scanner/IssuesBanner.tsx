@@ -1,9 +1,13 @@
 import { TriangleAlert } from "lucide-react";
 import { buttonStyles } from "@/components/buttonStyles";
 import { indexRoster, type Roster } from "@/domain/roster";
+import { useCurrentStaff } from "@/features/auth/StaffContext";
 import { m } from "@/messages";
 import { outbox } from "@/offline";
 import { useOutbox } from "@/offline/hooks";
+
+/** How many problems are listed before "…and N more". */
+const LISTED_ISSUES = 5;
 
 /**
  * Changes the server refused after they had been saved offline (for example a
@@ -11,13 +15,18 @@ import { useOutbox } from "@/offline/hooks";
  * person sees exactly what did not go through until they dismiss it.
  */
 export function IssuesBanner({ view }: { view: Roster | undefined }) {
-  const { issues } = useOutbox();
+  const staff = useCurrentStaff();
+  // Each person sees, and can dismiss, only their own.
+  const issues = useOutbox().issues.filter(
+    (issue) => issue.op.staffId === staff.id,
+  );
   if (issues.length === 0) return null;
 
   const index = view ? indexRoster(view) : undefined;
 
   return (
     <section
+      role="alert"
       aria-labelledby="issues-title"
       className="flex flex-col gap-2 rounded-xl bg-bad-soft p-4"
     >
@@ -29,7 +38,7 @@ export function IssuesBanner({ view }: { view: Roster | undefined }) {
         {m.scanner.issues.title(issues.length)}
       </h2>
       <ul className="flex flex-col gap-1 text-sm text-ink">
-        {issues.slice(0, 5).map(({ op, reason, at }) => (
+        {issues.slice(0, LISTED_ISSUES).map(({ op, reason, at }) => (
           <li key={`${op.id}-${at}`}>
             <span className="font-semibold">
               {index?.studentById.get(op.studentId)?.fullName ?? op.studentId}
@@ -39,10 +48,15 @@ export function IssuesBanner({ view }: { view: Roster | undefined }) {
             : {m.scanner.issues.reasons[reason]}
           </li>
         ))}
+        {issues.length > LISTED_ISSUES && (
+          <li className="text-muted">
+            {m.scanner.issues.more(issues.length - LISTED_ISSUES)}
+          </li>
+        )}
       </ul>
       <button
         type="button"
-        onClick={() => outbox.dismissIssues()}
+        onClick={() => outbox.dismissIssues(staff.id)}
         className={buttonStyles.link}
       >
         {m.common.dismiss}

@@ -1,22 +1,10 @@
 import type { Registration, Staff } from "@workspace/api-zod";
 import { canUndoCheckIn, normalizeStudentId } from "@workspace/attendance";
 import { db, registrationsTable } from "@workspace/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 import { HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
-
-const registrationColumns = {
-  studentId: registrationsTable.studentId,
-  eventId: registrationsTable.eventId,
-  checkedInAt: registrationsTable.checkedInAt,
-  checkedInBy: registrationsTable.checkedInBy,
-};
-
-const isRegistration = (eventId: string, studentId: string) =>
-  and(
-    eq(registrationsTable.studentId, studentId),
-    eq(registrationsTable.eventId, eventId),
-  );
+import { registrationColumns, registrationKey } from "./columns";
 
 /**
  * Clears a check-in and leaves the student registered. Undoing something
@@ -28,11 +16,12 @@ export async function undoCheckIn(
   rawStudentId: string,
 ): Promise<Registration> {
   const studentId = normalizeStudentId(rawStudentId);
+  const here = registrationKey(studentId, eventId);
 
   const [registration] = await db
     .select(registrationColumns)
     .from(registrationsTable)
-    .where(isRegistration(eventId, studentId));
+    .where(here);
   if (!registration) throw new HttpError(404, "Registration not found");
   if (!registration.checkedInAt) return registration;
   if (!canUndoCheckIn(staff, registration)) {
@@ -46,7 +35,7 @@ export async function undoCheckIn(
     .set({ checkedInAt: null, checkedInBy: null })
     .where(
       and(
-        isRegistration(eventId, studentId),
+        here,
         sql`${registrationsTable.checkedInBy} is not distinct from ${registration.checkedInBy}`,
       ),
     )
@@ -60,6 +49,6 @@ export async function undoCheckIn(
   const [current] = await db
     .select(registrationColumns)
     .from(registrationsTable)
-    .where(isRegistration(eventId, studentId));
+    .where(here);
   return current ?? registration;
 }

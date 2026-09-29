@@ -11,5 +11,11 @@
   },
   "peerDependencies": {
     "react": ">=18"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
   }
 }

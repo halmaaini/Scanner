@@ -6,6 +6,7 @@ import {
 import type { ScanOp, UndoOp } from "@/domain/ops";
 import { predictScan } from "@/domain/predict";
 import type { Roster } from "@/domain/roster";
+import { randomUuid } from "@/lib/uuid";
 import type { Outbox } from "./outbox";
 import type { SyncEngine } from "./sync";
 
@@ -52,12 +53,7 @@ export interface ScanInput {
  * Returns null when there was nothing to scan (blank input).
  */
 export async function submitScan(
-  {
-    outbox,
-    engine,
-    now = () => new Date(),
-    newId = () => crypto.randomUUID(),
-  }: Deps,
+  { outbox, engine, now = () => new Date(), newId = randomUuid }: Deps,
   { raw, eventId, staffId, view }: ScanInput,
 ): Promise<ScanResponse | null> {
   const studentId = normalizeStudentId(raw);
@@ -86,7 +82,7 @@ export async function submitScan(
   const predicted = view ? predictScan(view, scan) : undefined;
 
   outbox.add(scan);
-  const answer = (await engine.flush(staffId, scan.id)).get(scan.id);
+  const answer = await engine.send(scan);
 
   if (answer?.kind === "scan") {
     return { kind: "answered", result: answer.result, opId: scan.id };
@@ -98,10 +94,11 @@ export async function submitScan(
 
   // Not answered: the server could not be reached.
   if (!predicted) {
-    outbox.settle([scan.id]);
+    engine.cancel(scan.id);
     return { kind: "unavailable" };
   }
-  if (predicted.outcome !== "checked_in") outbox.settle([scan.id]);
+  // (If a background send already has it on the wire it stands, and the server decides.)
+  if (predicted.outcome !== "checked_in") engine.cancel(scan.id);
   return { kind: "offline", result: predicted, opId: scan.id };
 }
 
@@ -119,11 +116,25 @@ function unknownStudent(scan: ScanOp): ScanResult {
 /**
  * Undoes a check-in through the same queue as scans, so it is applied after
  * the scan it corrects even if that scan has not reached the server yet.
+ *
+ * If that scan has not left this device it simply never happens: taking it
+ * back beats sending an undo that, by the time it arrives, could land on
+ * someone else's check-in of the same student.
  */
 export async function submitUndo(
-  { outbox, engine, newId = () => crypto.randomUUID() }: Deps,
-  input: { studentId: string; eventId: string; staffId: number },
+  { outbox, engine, newId = randomUuid }: Deps,
+  input: {
+    studentId: string;
+    eventId: string;
+    staffId: number;
+    /** The scan being undone, if it may still be waiting on this device. */
+    scanOpId?: string;
+  },
 ): Promise<UndoResponse> {
+  if (input.scanOpId && engine.cancel(input.scanOpId)) {
+    return { kind: "done", registration: null };
+  }
+
   const op: UndoOp = {
     type: "undo",
     id: newId(),
@@ -132,7 +143,7 @@ export async function submitUndo(
     staffId: input.staffId,
   };
   outbox.add(op);
-  const answer = (await engine.flush(input.staffId, op.id)).get(op.id);
+  const answer = await engine.send(op);
 
   if (answer?.kind === "undo") {
     return { kind: "done", registration: answer.registration };

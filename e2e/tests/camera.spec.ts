@@ -18,7 +18,9 @@ test("reads a QR code from the camera, and keeps reading after 'Scan next'", asy
     by: "Sara",
   });
 
-  // The same QR is still in front of the camera: reading resumes and it is a repeat.
+  // The same QR is still in front of the camera. Reading resumes after a short
+  // pause (so a code that was just dealt with is not scanned twice in a blink),
+  // and it is then a repeat.
   await result.getByRole("button", { name: "Scan next" }).click();
   await expect(
     result.getByRole("heading", { name: "Already checked in" }),

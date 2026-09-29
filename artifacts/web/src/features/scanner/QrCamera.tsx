@@ -1,47 +1,26 @@
-import { CameraOff } from "lucide-react";
+import { CameraOff, LoaderCircle } from "lucide-react";
 import QrScanner from "qr-scanner";
 import { useEffect, useRef, useState } from "react";
+import { CAMERA_SCANS_PER_SECOND, SAME_CODE_COOLDOWN_MS } from "@/config";
 import { cn } from "@/lib/cn";
 import { m } from "@/messages";
+import { diagnoseCameraFailure, type CameraProblem } from "./camera";
 
-type CameraState = "starting" | "ready" | "denied" | "unavailable" | "error";
-
-/** Browsers report a missing or blocked camera in a few different ways. */
-function classify(error: unknown): CameraState {
-  const name = error instanceof DOMException ? error.name : "";
-  const text =
-    typeof error === "string"
-      ? error
-      : error instanceof Error
-        ? error.message
-        : "";
-  if (
-    name === "NotAllowedError" ||
-    name === "SecurityError" ||
-    /permission|denied/i.test(text)
-  ) {
-    return "denied";
-  }
-  if (
-    name === "NotFoundError" ||
-    name === "OverconstrainedError" ||
-    /not found|no camera/i.test(text)
-  ) {
-    return "unavailable";
-  }
-  return "error";
-}
+type CameraState = "starting" | "ready" | CameraProblem;
 
 const problemText: Record<Exclude<CameraState, "ready">, string> = {
   starting: m.scanner.cameraStarting,
   denied: m.scanner.cameraDenied,
   unavailable: m.scanner.cameraUnavailable,
+  insecure: m.scanner.cameraInsecure,
   error: m.scanner.cameraError,
 };
 
 interface QrCameraProps {
-  /** Keep the camera on but stop reading codes (while a result is on screen). */
+  /** Keep the camera on but ignore what it reads (while a result is on screen). */
   paused: boolean;
+  /** A scan is being checked: say so over the picture. */
+  busy: boolean;
   onDecode: (text: string) => void;
 }
 
@@ -80,21 +59,30 @@ function Viewfinder() {
 }
 
 /**
- * The live camera and QR reader. The camera stays on while a result is shown
- * (only reading is paused) so "Scan next" is instant instead of waiting for
- * the camera to start again.
+ * The live camera and QR reader. The camera stays on the whole time: while a
+ * result is shown it only stops reporting codes, so "Scan next" is instant
+ * instead of waiting for the camera (and possibly a permission prompt) again.
  */
-export function QrCamera({ paused, onDecode }: QrCameraProps) {
+export function QrCamera({ paused, busy, onDecode }: QrCameraProps) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const scannerRef = useRef<QrScanner | null>(null);
-  const pausedRef = useRef(false);
+  const pausedRef = useRef(paused);
   const onDecodeRef = useRef(onDecode);
+  // The code last reported, and until when the same code is ignored (see below).
+  const lastCode = useRef<string | null>(null);
+  const ignoreRepeatUntil = useRef(0);
   const [state, setState] = useState<CameraState>("starting");
 
   // Always call the latest handler without restarting the camera.
   useEffect(() => {
     onDecodeRef.current = onDecode;
   });
+
+  useEffect(() => {
+    pausedRef.current = paused;
+    // The code that was just dealt with is probably still in front of the
+    // camera when the result is dismissed; do not scan it again straight away.
+    if (!paused) ignoreRepeatUntil.current = Date.now() + SAME_CODE_COOLDOWN_MS;
+  }, [paused]);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -114,45 +102,42 @@ export function QrCamera({ paused, onDecode }: QrCameraProps) {
     let cancelled = false;
     const scanner = new QrScanner(
       video,
-      (result) => onDecodeRef.current(result.data),
+      (result) => {
+        if (pausedRef.current) return;
+        const text = result.data;
+        if (
+          text === lastCode.current &&
+          Date.now() < ignoreRepeatUntil.current
+        ) {
+          return;
+        }
+        lastCode.current = text;
+        onDecodeRef.current(text);
+      },
       {
         preferredCamera: "environment",
-        maxScansPerSecond: 8,
+        maxScansPerSecond: CAMERA_SCANS_PER_SECOND,
         returnDetailedScanResult: true,
         highlightScanRegion: false,
         highlightCodeOutline: false,
       },
     );
-    scannerRef.current = scanner;
     scanner
       .start()
       .then(() => {
         if (!cancelled) setState("ready");
       })
-      .catch((error: unknown) => {
-        if (!cancelled) setState(classify(error));
+      .catch(async () => {
+        const problem = await diagnoseCameraFailure();
+        if (!cancelled) setState(problem);
       });
 
     return () => {
       cancelled = true;
-      scannerRef.current = null;
-      pausedRef.current = false;
       scanner.destroy();
       video.remove();
     };
   }, []);
-
-  useEffect(() => {
-    const scanner = scannerRef.current;
-    if (!scanner || state !== "ready") return;
-    if (paused && !pausedRef.current) {
-      pausedRef.current = true;
-      void scanner.pause();
-    } else if (!paused && pausedRef.current) {
-      pausedRef.current = false;
-      scanner.start().catch(() => setState("error"));
-    }
-  }, [paused, state]);
 
   return (
     <div
@@ -165,6 +150,15 @@ export function QrCamera({ paused, onDecode }: QrCameraProps) {
           <p className="absolute inset-x-0 bottom-3.5 text-center text-sm text-on-dark">
             {m.scanner.cameraHint}
           </p>
+          {busy && (
+            <p
+              role="status"
+              className="absolute inset-0 flex items-center justify-center gap-2.5 bg-ink/80 text-lg font-semibold text-white"
+            >
+              <LoaderCircle className="size-6 animate-spin" aria-hidden />
+              {m.scanner.checking}
+            </p>
+          )}
         </>
       ) : (
         <div

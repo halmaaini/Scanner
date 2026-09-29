@@ -8,7 +8,8 @@ import type {
 
 export type { Event, Registration, Roster, StaffRef, Student };
 
-const rowKey = (studentId: string, eventId: string) =>
+/** One registration: a student on an event's list. */
+export const rowKey = (studentId: string, eventId: string) =>
   `${eventId}\u0000${studentId}`;
 
 /** Fast lookups over a roster; build once per roster, not per lookup. */

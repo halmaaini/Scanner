@@ -4,6 +4,7 @@ import path from "path";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { theme } from "./scripts/theme.mjs";
 
 // Replit sets PORT and BASE_PATH per artifact (see .replit-artifact/artifact.toml);
 // the defaults keep `pnpm build` and local runs working without them.
@@ -24,19 +25,27 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      // The browser's toolbar colour, from the same design token as everything else.
+      name: "theme-color",
+      transformIndexHtml: (html) => html.replaceAll("%THEME_COLOR%", theme.ink),
+    },
     runtimeErrorOverlay(),
     VitePWA({
       // Installable, and the app shell is cached so a scanner still opens with
       // no connection. Data is cached separately by the app (see lib/queryClient).
-      registerType: "autoUpdate",
+      // A new version is offered to the person (see components/UpdatePrompt),
+      // not swapped in under an open scanner.
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Attendance",
         short_name: "Attendance",
         description:
           "Check people in at events, even when the connection drops.",
-        theme_color: "#14213d",
-        background_color: "#f6f3ec",
+        theme_color: theme.ink,
+        background_color: theme.paper,
         display: "standalone",
         orientation: "portrait",
         scope: basePath,

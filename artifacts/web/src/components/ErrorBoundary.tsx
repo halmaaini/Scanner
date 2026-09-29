@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { forgetSavedCopy } from "@/lib/queryClient";
+import { buttonStyles } from "./buttonStyles";
 import { m } from "@/messages";
 
 interface State {
@@ -8,7 +10,9 @@ interface State {
 /**
  * Last line of defence: an unexpected error in a screen shows a plain message
  * with a reload button instead of a blank page (the person at the door has
- * nothing else to fall back on).
+ * nothing else to fall back on). If the saved copy of the student list is what
+ * keeps crashing the screen, a second button throws it away (unsent check-ins
+ * are kept: they are not part of it).
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { failed: false };
@@ -35,6 +39,17 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           className="h-14 rounded-[14px] bg-ink px-6 text-[17px] font-semibold text-white"
         >
           {m.common.crashed.reload}
+        </button>
+        <p className="mt-4 text-sm text-muted">{m.common.crashed.clearHint}</p>
+        <button
+          type="button"
+          onClick={() => {
+            forgetSavedCopy();
+            window.location.reload();
+          }}
+          className={buttonStyles.link}
+        >
+          {m.common.crashed.clearSaved}
         </button>
       </main>
     );

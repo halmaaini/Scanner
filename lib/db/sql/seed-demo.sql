@@ -1,7 +1,9 @@
 -- DEMO DATA, for trying the app on a development database.
 --
--- NEVER run this on the real database: it creates accounts with well-known
--- passwords. Safe to run more than once (it skips what already exists).
+-- NEVER load this into the real (published) database: it creates accounts with
+-- well-known passwords. It refuses to run if the database holds any account or
+-- student that is not demo data, and is safe to run more than once (it skips
+-- what already exists).
 --
 --   pnpm --filter @workspace/scripts run sql lib/db/sql/seed-demo.sql
 --
@@ -11,19 +13,15 @@
 
 BEGIN;
 
-INSERT INTO staff (username, password_hash, display_name, role) VALUES
-  ('boss', crypt('boss-demo-pw', gen_salt('bf', 10)), 'Hala', 'super'),
-  ('sara', crypt('sara-demo-pw', gen_salt('bf', 10)), 'Sara', 'admin'),
-  ('omar', crypt('omar-demo-pw', gen_salt('bf', 10)), 'Omar', 'admin')
-ON CONFLICT ((lower(username))) DO NOTHING;
+-- The demo people are listed once, here; the safety check and the inserts both use these lists.
+CREATE TEMP TABLE demo_staff (username text, password text, display_name text, role text) ON COMMIT DROP;
+INSERT INTO demo_staff VALUES
+  ('boss', 'boss-demo-pw', 'Hala', 'super'),
+  ('sara', 'sara-demo-pw', 'Sara', 'admin'),
+  ('omar', 'omar-demo-pw', 'Omar', 'admin');
 
-INSERT INTO events (id, name, sort_order, is_open) VALUES
-  ('rehearsal',  'Rehearsal',           1, true),
-  ('graduation', 'Graduation ceremony', 2, true),
-  ('trophy',     'Trophy handover',     3, false)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO students (student_id, full_name, is_active) VALUES
+CREATE TEMP TABLE demo_students (student_id text, full_name text, is_active boolean) ON COMMIT DROP;
+INSERT INTO demo_students VALUES
   ('1001', 'Layla Hassan',        true),
   ('1002', 'Yusuf Ibrahim',       true),
   ('1003', 'Karim Nasser',        false),  -- access revoked
@@ -33,7 +31,28 @@ INSERT INTO students (student_id, full_name, is_active) VALUES
   ('1007', 'Omar Haddad',         true),
   ('1008', 'فاطمة الزهراء',       true),
   ('1009', 'Sami Aziz',           true),
-  ('1010', 'Dina Farouk',         true)
+  ('1010', 'Dina Farouk',         true);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM staff WHERE lower(username) NOT IN (SELECT lower(username) FROM demo_staff))
+     OR EXISTS (SELECT 1 FROM students WHERE student_id NOT IN (SELECT student_id FROM demo_students)) THEN
+    RAISE EXCEPTION 'Refusing to load demo data: this database has accounts or students that are not demo data. Demo data is only for an empty development database.';
+  END IF;
+END $$;
+
+INSERT INTO staff (username, password_hash, display_name, role)
+SELECT username, crypt(password, gen_salt('bf', 10)), display_name, role FROM demo_staff
+ON CONFLICT ((lower(username))) DO NOTHING;
+
+INSERT INTO events (id, name, sort_order, is_open) VALUES
+  ('rehearsal',  'Rehearsal',           1, true),
+  ('graduation', 'Graduation ceremony', 2, true),
+  ('trophy',     'Trophy handover',     3, false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO students (student_id, full_name, is_active)
+SELECT student_id, full_name, is_active FROM demo_students
 ON CONFLICT (student_id) DO NOTHING;
 
 -- Everyone is on the rehearsal and graduation lists; only three get a trophy.

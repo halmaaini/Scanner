@@ -16,6 +16,12 @@ describe("foldName", () => {
   });
 });
 
+describe("foldName spacing", () => {
+  it("ignores extra spaces between and around words", () => {
+    expect(foldName("  Layla   Hassan ")).toBe("layla hassan");
+  });
+});
+
 describe("searchStudents", () => {
   const roster = makeRoster();
 
@@ -64,5 +70,21 @@ describe("searchStudents", () => {
       registrations: [],
     });
     expect(searchStudents(arabic, "احمد", 10).total).toBe(1);
+  });
+
+  it("finds an ID whatever its letter case", () => {
+    const lettered = makeRoster({
+      students: [
+        { studentId: "CS/2021/045", fullName: "Nour Saleh", isActive: true },
+      ],
+      registrations: [],
+    });
+    expect(searchStudents(lettered, "cs/2021", 10).total).toBe(1);
+    expect(searchStudents(lettered, "CS/2021/045", 10).total).toBe(1);
+  });
+
+  it("finds a name typed with different spacing", () => {
+    expect(searchStudents(roster, "layla   hassan", 10).total).toBe(1);
+    expect(searchStudents(roster, " layla hassan ", 10).total).toBe(1);
   });
 });

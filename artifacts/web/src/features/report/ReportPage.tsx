@@ -10,12 +10,10 @@ import { searchStudents } from "@/domain/search";
 import { latestCheckIns, summarizeEvents } from "@/domain/summary";
 import { cn } from "@/lib/cn";
 import { downloadTextFile } from "@/lib/download";
-import { formatWhen } from "@/lib/format";
+import { formatDay, formatWhen } from "@/lib/format";
+import { REPORT_LATEST_LIMIT, REPORT_SEARCH_LIMIT } from "@/config";
 import { m } from "@/messages";
 import { useRosterView } from "@/offline/hooks";
-
-const LATEST_LIMIT = 20;
-const SEARCH_LIMIT = 25;
 
 /** The super admin's overview: progress per event, search, latest check-ins, CSV. */
 export function ReportPage() {
@@ -24,21 +22,20 @@ export function ReportPage() {
 
   const summaries = useMemo(() => (view ? summarizeEvents(view) : []), [view]);
   const latest = useMemo(
-    () => (view ? latestCheckIns(view, LATEST_LIMIT) : []),
+    () => (view ? latestCheckIns(view, REPORT_LATEST_LIMIT) : []),
     [view],
   );
   const found = useMemo(
     () =>
       view && text.trim()
-        ? searchStudents(view, text, SEARCH_LIMIT)
+        ? searchStudents(view, text, REPORT_SEARCH_LIMIT)
         : undefined,
     [view, text],
   );
 
   function exportCsv() {
     if (!view) return;
-    const day = new Date().toISOString().slice(0, 10);
-    downloadTextFile(`attendance-${day}.csv`, buildAttendanceCsv(view));
+    downloadTextFile(`attendance-${formatDay()}.csv`, buildAttendanceCsv(view));
   }
 
   return (
@@ -62,7 +59,7 @@ export function ReportPage() {
             {m.report.loading}
           </p>
         ) : (
-          <section className="flex flex-col items-start gap-3 rounded-[20px] bg-white p-6">
+          <section className="flex flex-col items-start gap-3 rounded-[20px] bg-surface p-6">
             <p role="alert">{m.report.failed}</p>
             <Button variant="outline" onClick={() => void query.refetch()}>
               {m.common.retry}
@@ -78,7 +75,7 @@ export function ReportPage() {
             {summaries.map(({ event, expected, checkedIn }) => (
               <div
                 key={event.id}
-                className="flex flex-col gap-2 rounded-2xl bg-white p-4"
+                className="flex flex-col gap-2 rounded-2xl bg-surface p-4"
               >
                 <div className="flex justify-between gap-3 text-base">
                   <span className="font-semibold">{event.name}</span>

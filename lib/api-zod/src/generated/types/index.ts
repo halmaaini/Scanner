@@ -16,6 +16,7 @@ export * from './forbiddenResponse';
 export * from './healthStatus';
 export * from './loginInput';
 export * from './notFoundResponse';
+export * from './payloadTooLargeResponse';
 export * from './registration';
 export * from './roster';
 export * from './scan';

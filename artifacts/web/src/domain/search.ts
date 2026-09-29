@@ -2,13 +2,15 @@ import { normalizeStudentId } from "@workspace/attendance";
 import type { Event, Roster, Student } from "./roster";
 
 /**
- * Makes names comparable for searching: case, accents and Arabic spelling
- * variants (أ/إ/آ vs ا, ة vs ه, ى vs ي, vowel marks) no longer matter.
+ * Makes names comparable for searching: case, accents, runs of spaces and
+ * Arabic spelling variants (أ/إ/آ vs ا, ة vs ه, ى vs ي, vowel marks) no longer matter.
  */
 export function foldName(text: string): string {
   return text
     .normalize("NFKD")
     .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
     .replace(/[\u0300-\u036f\u064b-\u065f\u0670\u0640]/g, "")
     .replace(/[\u0622\u0623\u0625\u0671]/g, "\u0627")
     .replace(/\u0629/g, "\u0647")
@@ -36,12 +38,12 @@ export function searchStudents(
   const trimmed = query.trim();
   if (!trimmed) return { matches: [], total: 0 };
 
-  const idQuery = normalizeStudentId(trimmed);
+  const idQuery = normalizeStudentId(trimmed).toLowerCase();
   const nameQuery = foldName(trimmed);
 
   const found = roster.students.filter(
     (s) =>
-      (idQuery !== "" && s.studentId.includes(idQuery)) ||
+      (idQuery !== "" && s.studentId.toLowerCase().includes(idQuery)) ||
       foldName(s.fullName).includes(nameQuery),
   );
   const shown = new Set(found.slice(0, limit).map((s) => s.studentId));

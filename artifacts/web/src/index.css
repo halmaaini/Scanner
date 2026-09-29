@@ -9,9 +9,13 @@
     "Segoe UI", sans-serif;
 
   --color-paper: #f6f3ec;
+  /* Cards, inputs and other raised areas. */
+  --color-surface: #ffffff;
   --color-ink: #14213d;
+  --color-ink-hover: #1f2f52;
   --color-muted: #4b5162;
-  --color-line: #b9b4a6;
+  /* The outline of inputs and controls: at least 3:1 against white and paper. */
+  --color-line: #8c8677;
   --color-rule: #dad4c4;
   --color-track: #e6e1d3;
   --color-gold: #e2b65a;

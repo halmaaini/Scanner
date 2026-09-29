@@ -5,7 +5,11 @@ import type {
   Staff,
   Student,
 } from "@workspace/api-zod";
-import { evaluateScan, normalizeStudentId } from "@workspace/attendance";
+import {
+  evaluateScan,
+  isRecorded,
+  normalizeStudentId,
+} from "@workspace/attendance";
 import {
   db,
   eventsTable,
@@ -13,20 +17,27 @@ import {
   studentsTable,
 } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
+import {
+  registrationColumns,
+  registrationKey,
+  studentColumns,
+} from "./columns";
 
 export interface ScanInput {
   id: string;
   studentId: string;
   eventId: string;
-  scannedAt: Date;
+  /** ISO 8601 time the scan physically happened. */
+  scannedAt: string;
 }
 
-const registrationColumns = {
-  studentId: registrationsTable.studentId,
-  eventId: registrationsTable.eventId,
-  checkedInAt: registrationsTable.checkedInAt,
-  checkedInBy: registrationsTable.checkedInBy,
-};
+/**
+ * How many times one scan is judged again after another scanner (or an undo)
+ * changed its registration between reading and writing. A second is already
+ * far-fetched; three in a row means something is wrong, and the scan is left
+ * queued on the scanner to be retried.
+ */
+const MAX_ATTEMPTS = 3;
 
 interface Facts {
   event: { id: string } | undefined;
@@ -41,22 +52,13 @@ async function loadFacts(eventId: string, studentId: string): Promise<Facts> {
       .from(eventsTable)
       .where(eq(eventsTable.id, eventId)),
     db
-      .select({
-        studentId: studentsTable.studentId,
-        fullName: studentsTable.fullName,
-        isActive: studentsTable.isActive,
-      })
+      .select(studentColumns)
       .from(studentsTable)
       .where(eq(studentsTable.studentId, studentId)),
     db
       .select(registrationColumns)
       .from(registrationsTable)
-      .where(
-        and(
-          eq(registrationsTable.studentId, studentId),
-          eq(registrationsTable.eventId, eventId),
-        ),
-      ),
+      .where(registrationKey(studentId, eventId)),
   ]);
   return { event, student, registration };
 }
@@ -67,14 +69,13 @@ function toResult(
   outcome: ScanOutcome,
   facts: Facts,
 ): ScanResult {
-  const recorded = outcome === "checked_in" || outcome === "already_checked_in";
   return {
     id: scan.id,
     outcome,
     studentId,
     eventId: scan.eventId,
     student: facts.student ?? null,
-    registration: recorded ? (facts.registration ?? null) : null,
+    registration: isRecorded(outcome) ? (facts.registration ?? null) : null,
   };
 }
 
@@ -85,51 +86,46 @@ function notAfter(scannedAt: Date, now: Date): Date {
 
 async function recordScan(staff: Staff, scan: ScanInput): Promise<ScanResult> {
   const studentId = normalizeStudentId(scan.studentId);
-  const facts = await loadFacts(scan.eventId, studentId);
 
-  // The rules live in one shared function (also used by offline scanners).
-  const outcome = evaluateScan(facts);
-  if (outcome !== "checked_in")
-    return toResult(scan, studentId, outcome, facts);
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const facts = await loadFacts(scan.eventId, studentId);
 
-  // `checkedInAt is null` makes the write itself the guard: if two scanners
-  // race for the same student, exactly one update matches.
-  const [updated] = await db
-    .update(registrationsTable)
-    .set({
-      checkedInAt: notAfter(scan.scannedAt, new Date()),
-      checkedInBy: staff.id,
-    })
-    .where(
-      and(
-        eq(registrationsTable.studentId, studentId),
-        eq(registrationsTable.eventId, scan.eventId),
-        isNull(registrationsTable.checkedInAt),
-      ),
-    )
-    .returning(registrationColumns);
+    // The rules live in one shared function (also used by offline scanners).
+    const outcome = evaluateScan(facts);
+    if (outcome !== "checked_in") {
+      return toResult(scan, studentId, outcome, facts);
+    }
 
-  if (updated) {
-    return toResult(scan, studentId, "checked_in", {
-      ...facts,
-      registration: updated,
-    });
+    // `checkedInAt is null` makes the write itself the guard: if two scanners
+    // race for the same student, exactly one update matches.
+    const [updated] = await db
+      .update(registrationsTable)
+      .set({
+        checkedInAt: notAfter(new Date(scan.scannedAt), new Date()),
+        checkedInBy: staff.id,
+      })
+      .where(
+        and(
+          registrationKey(studentId, scan.eventId),
+          isNull(registrationsTable.checkedInAt),
+        ),
+      )
+      .returning(registrationColumns);
+
+    if (updated) {
+      return toResult(scan, studentId, "checked_in", {
+        ...facts,
+        registration: updated,
+      });
+    }
+    // Lost the race: the registration changed after it was read. Judge the
+    // scan again on what is there now (checked in by someone else, removed,
+    // or undone and free again) rather than guess.
   }
 
-  // Lost the race: someone else checked the student in after we read it.
-  const [current] = await db
-    .select(registrationColumns)
-    .from(registrationsTable)
-    .where(
-      and(
-        eq(registrationsTable.studentId, studentId),
-        eq(registrationsTable.eventId, scan.eventId),
-      ),
-    );
-  return toResult(scan, studentId, "already_checked_in", {
-    ...facts,
-    registration: current,
-  });
+  throw new Error(
+    `Scan ${scan.id} could not be recorded: its registration kept changing`,
+  );
 }
 
 /**

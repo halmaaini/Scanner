@@ -33,3 +33,12 @@ export function evaluateScan(facts: ScanFacts): ScanOutcome {
   if (facts.registration.checkedInAt) return "already_checked_in";
   return "checked_in";
 }
+
+/**
+ * Whether a scan's outcome leaves the student checked in: recorded just now, or
+ * already recorded before. These are the outcomes that carry a registration,
+ * and the ones a scanner never has to report back as a problem.
+ */
+export function isRecorded(outcome: ScanOutcome): boolean {
+  return outcome === "checked_in" || outcome === "already_checked_in";
+}

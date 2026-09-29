@@ -7,17 +7,14 @@ import {
   studentsTable,
 } from "@workspace/db";
 import { asc, eq } from "drizzle-orm";
+import { isoTimestamp, studentColumns } from "./columns";
 
 /** A student's public card, or null if the ID is unknown. */
 export async function getCard(rawStudentId: string): Promise<Card | null> {
   const studentId = normalizeStudentId(rawStudentId);
 
   const [student] = await db
-    .select({
-      studentId: studentsTable.studentId,
-      fullName: studentsTable.fullName,
-      isActive: studentsTable.isActive,
-    })
+    .select(studentColumns)
     .from(studentsTable)
     .where(eq(studentsTable.studentId, studentId));
   if (!student) return null;
@@ -27,7 +24,7 @@ export async function getCard(rawStudentId: string): Promise<Card | null> {
       id: eventsTable.id,
       name: eventsTable.name,
       sortOrder: eventsTable.sortOrder,
-      checkedInAt: registrationsTable.checkedInAt,
+      checkedInAt: isoTimestamp(registrationsTable.checkedInAt),
     })
     .from(registrationsTable)
     .innerJoin(eventsTable, eq(registrationsTable.eventId, eventsTable.id))

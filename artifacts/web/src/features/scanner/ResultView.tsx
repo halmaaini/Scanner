@@ -3,11 +3,7 @@ import { useEffect, useId, useState } from "react";
 import { buttonStyles } from "@/components/buttonStyles";
 import { cn } from "@/lib/cn";
 import { m } from "@/messages";
-import {
-  describeResult,
-  type ResultDescription,
-  type Tone,
-} from "./describeResult";
+import type { ResultDescription, Tone } from "./describeResult";
 
 const TONES: Record<
   Tone,
@@ -48,6 +44,7 @@ export function ResultView({
   onNext,
 }: ResultViewProps) {
   const titleId = useId();
+  const detailsId = useId();
   const tone = TONES[description.tone];
   const [undoing, setUndoing] = useState(false);
   const [undoFailed, setUndoFailed] = useState(false);
@@ -76,6 +73,7 @@ export function ResultView({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      aria-describedby={detailsId}
       className={cn(
         "on-dark fixed inset-0 z-50 overflow-y-auto text-white",
         tone.screen,
@@ -83,7 +81,7 @@ export function ResultView({
     >
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col gap-7 px-6 pt-14 pb-[max(1.75rem,env(safe-area-inset-bottom))]">
         <div className="flex flex-col items-center gap-5 pt-9">
-          <div className="flex size-28 items-center justify-center rounded-full bg-white">
+          <div className="flex size-28 items-center justify-center rounded-full bg-surface">
             <tone.Icon
               className={cn("size-14", tone.accent)}
               strokeWidth={2.6}
@@ -103,7 +101,10 @@ export function ResultView({
           )}
         </div>
 
-        <div className="flex flex-col gap-1.5 rounded-[20px] bg-white p-6 text-ink">
+        <div
+          id={detailsId}
+          className="flex flex-col gap-1.5 rounded-[20px] bg-surface p-6 text-ink"
+        >
           <p className="font-display text-[28px] leading-tight font-semibold">
             <bdi>{description.name}</bdi>
           </p>
@@ -165,7 +166,7 @@ export function ResultView({
               </button>
               {undoFailed && (
                 <p role="alert" className="text-center text-sm font-semibold">
-                  {m.results.undoFailed}
+                  {m.results.undoRefused}
                 </p>
               )}
             </>

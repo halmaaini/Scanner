@@ -1,5 +1,8 @@
 import { useGetCard, type Card } from "@workspace/api-client-react";
-import { normalizeStudentId } from "@workspace/attendance";
+import {
+  MAX_STUDENT_ID_LENGTH,
+  normalizeStudentId,
+} from "@workspace/attendance";
 import { Check } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Link } from "wouter";
@@ -10,14 +13,24 @@ import { Splash } from "@/components/Splash";
 import { cn } from "@/lib/cn";
 import { isNetworkError, statusOf } from "@/lib/errors";
 import { formatWhen } from "@/lib/format";
+import { themeColor } from "@/lib/theme";
+import { CARD_STALE_MS } from "@/config";
 import { m } from "@/messages";
+import { studentIdFromParam } from "./cardPath";
 import { initialsOf } from "./initials";
 
 /** Public: a student's card with their QR code and which events they have attended. */
 export function CardPage({ studentId }: { studentId: string }) {
-  const id = normalizeStudentId(studentId);
+  const id = normalizeStudentId(studentIdFromParam(studentId));
+  // Too long to be a student ID: no need to ask the server to say so.
+  const tooLong = id.length > MAX_STUDENT_ID_LENGTH;
   const card = useGetCard(encodeURIComponent(id), {
-    query: { retry: false, staleTime: 30_000, refetchOnWindowFocus: true },
+    query: {
+      enabled: !tooLong,
+      retry: false,
+      staleTime: CARD_STALE_MS,
+      refetchOnWindowFocus: true,
+    },
   });
 
   if (card.data) {
@@ -31,23 +44,23 @@ export function CardPage({ studentId }: { studentId: string }) {
       />
     );
   }
-  if (card.isPending) return <Splash />;
+  if (!tooLong && card.isPending) return <Splash />;
 
-  const code = statusOf(card.error);
+  const code = tooLong ? 404 : statusOf(card.error);
   return (
     <Screen className="gap-5 pt-8">
       <Link href="/card" className={buttonStyles.link}>
         {m.common.back}
       </Link>
       {code === 404 ? (
-        <section className="flex flex-col gap-2 rounded-[20px] bg-white p-6">
+        <section className="flex flex-col gap-2 rounded-[20px] bg-surface p-6">
           <h1 className="font-display text-2xl font-semibold">
             {m.card.notFound.title}
           </h1>
           <p className="text-[15px] text-muted">{m.card.notFound.body}</p>
         </section>
       ) : (
-        <section className="flex flex-col items-start gap-3 rounded-[20px] bg-white p-6">
+        <section className="flex flex-col items-start gap-3 rounded-[20px] bg-surface p-6">
           <p role="alert" className="text-base">
             {code === 429 ? m.card.tooMany : m.card.failed}
           </p>
@@ -94,14 +107,14 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
 
         {card.isActive ? (
           <>
-            <div className="self-center rounded-2xl bg-white p-2">
+            <div className="self-center rounded-2xl bg-surface p-2">
               <QRCodeSVG
                 value={card.studentId}
                 size={184}
                 level="M"
                 marginSize={4}
-                fgColor="#14213d"
-                bgColor="#ffffff"
+                fgColor={themeColor("ink")}
+                bgColor={themeColor("surface")}
                 role="img"
                 aria-label={m.card.qrLabel(card.studentId)}
               />

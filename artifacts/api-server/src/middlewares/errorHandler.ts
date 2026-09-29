@@ -1,5 +1,4 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
-import { ZodError } from "zod";
 import { HttpError } from "../lib/http";
 
 /** Unknown /api paths get the normal error body instead of Express's HTML page. */
@@ -24,17 +23,6 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
 
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });
-    return;
-  }
-
-  if (err instanceof ZodError) {
-    const issue = err.issues[0];
-    const where = issue?.path.join(".");
-    res.status(400).json({
-      error: issue
-        ? `Invalid request${where ? ` (${where})` : ""}: ${issue.message}`
-        : "Invalid request",
-    });
     return;
   }
 

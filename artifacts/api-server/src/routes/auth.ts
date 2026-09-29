@@ -6,7 +6,7 @@ import {
 import type { Request } from "express";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { SESSION_COOKIE_NAME } from "../config";
-import { HttpError, sendJson } from "../lib/http";
+import { HttpError, parseRequest, sendJson } from "../lib/http";
 import { requireStaff, staffOf } from "../middlewares/requireStaff";
 import { verifyCredentials } from "../services/auth";
 
@@ -28,7 +28,7 @@ export function createAuthRouter(loginLimiter: RequestHandler): IRouter {
   const router: IRouter = Router();
 
   router.post("/auth/login", loginLimiter, async (req, res) => {
-    const { username, password } = LoginBody.parse(req.body);
+    const { username, password } = parseRequest(LoginBody, req.body);
 
     const staff = await verifyCredentials(username, password);
     if (!staff) throw new HttpError(401, "Invalid username or password");

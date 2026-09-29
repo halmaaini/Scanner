@@ -7,10 +7,11 @@
 import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { theme } from "./theme.mjs";
 
 const publicDir = path.resolve(import.meta.dirname, "../public");
-const NAVY = "#14213d";
-const GOLD = "#e2b65a";
+const NAVY = theme.ink;
+const GOLD = theme.gold;
 
 // The cap, drawn on a 24-unit grid (the same drawing as the lucide "graduation cap").
 const CAP = `<path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M7 10.5V15c0 1.5 2.2 3 5 3s5-1.5 5-3v-4.5"/>`;

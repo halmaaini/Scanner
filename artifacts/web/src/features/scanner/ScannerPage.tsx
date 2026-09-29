@@ -1,6 +1,6 @@
 import { canUndoCheckIn, can } from "@workspace/attendance";
 import { LoaderCircle } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/Button";
 import { buttonStyles } from "@/components/buttonStyles";
@@ -36,7 +36,11 @@ export function ScannerPage() {
     () => view?.events.filter((e) => e.isOpen) ?? [],
     [view],
   );
-  const [eventId, chooseEvent] = useSelectedEvent(openEvents);
+  const {
+    eventId,
+    choose: chooseEvent,
+    replaced,
+  } = useSelectedEvent(openEvents);
   const summary = useMemo(
     () => (view ? summaryFor(summarizeEvents(view), eventId) : undefined),
     [view, eventId],
@@ -44,14 +48,20 @@ export function ScannerPage() {
   const index = useMemo(() => (view ? indexRoster(view) : undefined), [view]);
 
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [checking, setChecking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   // One scan at a time: the camera reports the same code many times a second.
   const busy = useRef(false);
+  // After a typed ID, the cursor goes back to the field once the result is closed.
+  const manualField = useRef<HTMLInputElement>(null);
+  const returnToField = useRef(false);
 
   const scan = useCallback(
-    async (raw: string) => {
+    async (raw: string, source: "camera" | "typed") => {
       if (busy.current || !eventId) return;
       busy.current = true;
+      setChecking(true);
+      returnToField.current = source === "typed";
       try {
         const response = await scanning.scan({
           raw,
@@ -73,6 +83,8 @@ export function ScannerPage() {
       } catch {
         setNotice(m.scanner.scanFailed);
         busy.current = false;
+      } finally {
+        setChecking(false);
       }
     },
     [eventId, staff.id, view],
@@ -82,6 +94,16 @@ export function ScannerPage() {
     setAnswer(null);
     busy.current = false;
   }, []);
+
+  // The page is out of reach while a result is up; when it closes, a person who
+  // was typing gets the cursor back in the field (a camera user does not: that
+  // would pop the keyboard over the camera).
+  useEffect(() => {
+    if (answer === null && returnToField.current) {
+      returnToField.current = false;
+      manualField.current?.focus();
+    }
+  }, [answer]);
 
   const description = useMemo(() => {
     if (!answer) return undefined;
@@ -102,6 +124,7 @@ export function ScannerPage() {
       studentId,
       eventId: undoEventId,
       staffId: staff.id,
+      scanOpId: answer.opId,
     });
     if (response.kind === "refused") return false;
     setNotice(
@@ -162,7 +185,7 @@ export function ScannerPage() {
             onRetry={() => void query.refetch()}
           />
         ) : openEvents.length === 0 ? (
-          <section className="flex flex-col gap-2 rounded-[20px] bg-white p-6">
+          <section className="flex flex-col gap-2 rounded-[20px] bg-surface p-6">
             <h2 className="font-display text-2xl font-semibold">
               {m.scanner.noOpenEvents.title}
             </h2>
@@ -180,7 +203,7 @@ export function ScannerPage() {
                 id="event"
                 value={eventId}
                 onChange={(e) => chooseEvent(e.target.value)}
-                className="h-[52px] w-full rounded-xl border-[1.5px] border-ink bg-white px-3.5 text-[17px] font-semibold text-ink"
+                className="h-[52px] w-full rounded-xl border-[1.5px] border-ink bg-surface px-3.5 text-[17px] font-semibold text-ink"
               >
                 {openEvents.map((event) => (
                   <option key={event.id} value={event.id}>
@@ -188,6 +211,14 @@ export function ScannerPage() {
                   </option>
                 ))}
               </select>
+              {replaced && (
+                <p role="status" className="text-sm font-semibold text-warn">
+                  {m.scanner.eventReplaced(
+                    index?.eventById.get(replaced)?.name ?? replaced,
+                    index?.eventById.get(eventId ?? "")?.name ?? "",
+                  )}
+                </p>
+              )}
             </div>
 
             {summary && (
@@ -202,8 +233,9 @@ export function ScannerPage() {
             )}
 
             <QrCamera
-              paused={answer !== null}
-              onDecode={(text) => void scan(text)}
+              paused={answer !== null || checking}
+              busy={checking}
+              onDecode={(text) => void scan(text, "camera")}
             />
 
             <div
@@ -216,8 +248,9 @@ export function ScannerPage() {
             </div>
 
             <ManualEntry
-              onSubmit={(id) => void scan(id)}
-              disabled={answer !== null}
+              inputRef={manualField}
+              onSubmit={(id) => void scan(id, "typed")}
+              disabled={answer !== null || checking}
             />
           </>
         )}
@@ -260,7 +293,7 @@ function RosterUnavailable({
     );
   }
   return (
-    <section className="flex flex-col items-start gap-3 rounded-[20px] bg-white p-6">
+    <section className="flex flex-col items-start gap-3 rounded-[20px] bg-surface p-6">
       <p role="alert" className="text-base">
         {online ? m.scanner.rosterFailed : m.scanner.noRosterOffline}
       </p>

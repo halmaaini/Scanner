@@ -1,10 +1,10 @@
 import { useGetCurrentStaff, type Staff } from "@workspace/api-client-react";
+import { STAFF_STALE_MS } from "@/config";
 import { isUnauthorized } from "@/lib/errors";
 
 export type StaffState =
   | { status: "loading" }
-  /** `unreachable`: nobody is saved on this device and the server cannot be reached. */
-  | { status: "signedOut"; unreachable: boolean }
+  | { status: "signedOut" }
   | { status: "signedIn"; staff: Staff };
 
 /**
@@ -14,13 +14,17 @@ export type StaffState =
  */
 export function useStaff(): StaffState {
   const query = useGetCurrentStaff({
-    query: { retry: false, staleTime: 60_000, refetchOnWindowFocus: true },
+    query: {
+      retry: false,
+      staleTime: STAFF_STALE_MS,
+      refetchOnWindowFocus: true,
+    },
   });
 
   // Checked first: after a 401 the query still holds the previous answer.
-  if (isUnauthorized(query.error))
-    return { status: "signedOut", unreachable: false };
+  if (isUnauthorized(query.error)) return { status: "signedOut" };
   if (query.data) return { status: "signedIn", staff: query.data.staff };
   if (query.isPending) return { status: "loading" };
-  return { status: "signedOut", unreachable: true };
+  // Nobody is saved on this device and the server cannot be reached.
+  return { status: "signedOut" };
 }

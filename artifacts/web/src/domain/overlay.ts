@@ -1,8 +1,5 @@
 import type { PendingOp } from "./ops";
-import type { Registration, Roster } from "./roster";
-
-const rowKey = (studentId: string, eventId: string) =>
-  `${eventId}\u0000${studentId}`;
+import { rowKey, type Registration, type Roster } from "./roster";
 
 /**
  * The roster as this device sees it: what the server last said, with this

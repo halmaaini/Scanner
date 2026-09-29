@@ -11,6 +11,9 @@ export interface CardEvent {
   id: string;
   name: string;
   sortOrder: number;
-  /** @nullable */
-  checkedInAt: Date | null;
+  /**
+     * When the student checked in (UTC, ISO 8601); null until then.
+     * @nullable
+     */
+  checkedInAt: string | null;
 }

@@ -13,8 +13,11 @@
 export interface Registration {
   studentId: string;
   eventId: string;
-  /** @nullable */
-  checkedInAt: Date | null;
+  /**
+     * When the student checked in (UTC, ISO 8601); null until then.
+     * @nullable
+     */
+  checkedInAt: string | null;
   /**
      * Id of the staff member who checked the student in.
      * @nullable

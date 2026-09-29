@@ -20,12 +20,16 @@ if (Number.isNaN(port) || port <= 0) {
 // Bring the database up to date before serving anything. `build.mjs` copies
 // the migrations next to the bundle; the same code runs in development and
 // production, so there is no separate migration step to forget.
-const migrationsFolder =
-  process.env["MIGRATIONS_DIR"] ?? path.join(__dirname, "migrations");
-
 try {
-  await runMigrations(migrationsFolder);
-  logger.info("Database migrations are up to date");
+  const outcome = await runMigrations(path.join(__dirname, "migrations"));
+  logger.info({ outcome }, "Database migrations are up to date");
+  if (outcome === "adopted") {
+    // Replit copies the development database's tables to production when
+    // publishing, so the migrations had nothing left to create.
+    logger.info(
+      "The tables were already in place; the migrations were recorded, not run",
+    );
+  }
 } catch (err) {
   logger.error({ err }, "Database migration failed");
   process.exit(1);

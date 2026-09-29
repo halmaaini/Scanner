@@ -14,18 +14,33 @@ export const qrVideoPath = (studentId: string) =>
   path.join(TMP_DIR, `qr-${studentId}.y4m`);
 
 /**
- * Browser launch options: fake camera on (no prompts), optionally showing a
- * video file, and a browser of your choosing via CHROMIUM_PATH.
+ * Browser launch options: a browser of your choosing via CHROMIUM_PATH, and a
+ * fake camera. By default it is on (no permission prompt) and optionally shows a
+ * video file; `camera` can instead make it unusable in the two ways real ones
+ * are: blocked by the person, or not there at all.
  */
-export function browserArgs(cameraVideo?: string) {
-  return {
-    executablePath: process.env.CHROMIUM_PATH || undefined,
-    args: [
+export function browserArgs(
+  cameraVideo?: string,
+  camera: "working" | "blocked" | "missing" = "working",
+) {
+  const flags: Record<typeof camera, string[]> = {
+    working: [
       "--use-fake-ui-for-media-stream",
       "--use-fake-device-for-media-stream",
       ...(cameraVideo
         ? [`--use-file-for-fake-video-capture=${cameraVideo}`]
         : []),
     ],
+    // There is a camera, but the person says no.
+    blocked: [
+      "--use-fake-device-for-media-stream",
+      "--deny-permission-prompts",
+    ],
+    // No fake device: the browser finds no camera at all.
+    missing: [],
+  };
+  return {
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: flags[camera],
   };
 }

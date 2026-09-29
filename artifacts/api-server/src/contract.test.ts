@@ -4,13 +4,16 @@ import {
 } from "@workspace/attendance";
 import {
   GetCardParams,
+  StaffRole,
   SubmitScansBody,
   UndoCheckInParams,
 } from "@workspace/api-zod";
+import { STAFF_ROLES } from "@workspace/db";
 import { describe, expect, it } from "vitest";
 
-// Guards the numbers that live both in the shared library (so scanners can
-// apply them offline) and in the OpenAPI spec (so the server can): they must agree.
+// Guards the facts that live both in the shared library or the database (so
+// scanners and Postgres can apply them) and in the OpenAPI spec (so the server
+// can): they must agree.
 describe("API contract matches the shared rules", () => {
   const atLimit = "1".repeat(MAX_STUDENT_ID_LENGTH);
   const overLimit = "1".repeat(MAX_STUDENT_ID_LENGTH + 1);
@@ -53,5 +56,11 @@ describe("API contract matches the shared rules", () => {
       SubmitScansBody.safeParse(many(MAX_SCANS_PER_REQUEST + 1)).success,
     ).toBe(false);
     expect(SubmitScansBody.safeParse(many(0)).success).toBe(false);
+  });
+
+  // The spec's roles feed the API and `lib/attendance`; the database check
+  // constraint has its own copy (`STAFF_ROLES`), since SQL cannot import a spec.
+  it("knows the same staff roles as the database", () => {
+    expect([...STAFF_ROLES].sort()).toEqual(Object.values(StaffRole).sort());
   });
 });

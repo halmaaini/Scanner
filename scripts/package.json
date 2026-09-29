@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "sql": "tsx ./src/run-sql.ts",
+    "check-generated": "tsx ./src/check-generated.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

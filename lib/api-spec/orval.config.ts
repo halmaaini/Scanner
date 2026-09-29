@@ -64,11 +64,13 @@ export default defineConfig({
           coerce: {
             query: ["boolean", "number", "string"],
             param: ["boolean", "number", "string"],
-            body: ["bigint", "date"],
-            response: ["bigint", "date"],
+            body: ["bigint"],
+            response: ["bigint"],
           },
         },
-        useDates: true,
+        // Timestamps stay ISO strings, as they are on the wire, and are
+        // validated as such: `date-time` becomes `zod.iso.datetime()`, not a
+        // lenient `coerce.date()` that turns `null` or `"0"` into a date.
         useBigInt: true,
       },
     },

@@ -7,6 +7,12 @@ import {
   studentsTable,
 } from "@workspace/db";
 import { asc } from "drizzle-orm";
+import {
+  eventColumns,
+  registrationColumns,
+  staffRefColumns,
+  studentColumns,
+} from "./columns";
 
 /**
  * The whole dataset a scanner works from. Read in one repeatable-read
@@ -17,31 +23,17 @@ export async function getRoster(): Promise<Roster> {
   return db.transaction(
     async (tx) => {
       const events = await tx
-        .select({
-          id: eventsTable.id,
-          name: eventsTable.name,
-          sortOrder: eventsTable.sortOrder,
-          isOpen: eventsTable.isOpen,
-        })
+        .select(eventColumns)
         .from(eventsTable)
         .orderBy(asc(eventsTable.sortOrder), asc(eventsTable.id));
 
       const students = await tx
-        .select({
-          studentId: studentsTable.studentId,
-          fullName: studentsTable.fullName,
-          isActive: studentsTable.isActive,
-        })
+        .select(studentColumns)
         .from(studentsTable)
         .orderBy(asc(studentsTable.studentId));
 
       const registrations = await tx
-        .select({
-          studentId: registrationsTable.studentId,
-          eventId: registrationsTable.eventId,
-          checkedInAt: registrationsTable.checkedInAt,
-          checkedInBy: registrationsTable.checkedInBy,
-        })
+        .select(registrationColumns)
         .from(registrationsTable)
         .orderBy(
           asc(registrationsTable.eventId),
@@ -50,7 +42,7 @@ export async function getRoster(): Promise<Roster> {
 
       // Every staff member, active or not: an old check-in still shows who did it.
       const staff = await tx
-        .select({ id: staffTable.id, displayName: staffTable.displayName })
+        .select(staffRefColumns)
         .from(staffTable)
         .orderBy(asc(staffTable.id));
 

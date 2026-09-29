@@ -2,11 +2,13 @@ import type { Page } from "@playwright/test";
 import {
   countLine,
   expect,
+  fillSignIn,
   registrationOf,
   scanById,
   signIn,
   sql,
   test,
+  waitForSavedCopy,
 } from "../support";
 
 const waiting = (page: Page, n: number) =>
@@ -88,7 +90,7 @@ test.describe("with no connection", () => {
     await expect(allSaved(page)).toBeVisible();
   });
 
-  test("undoes a saved scan before it ever reaches the server", async ({
+  test("takes back a saved scan that never reached the server", async ({
     page,
     context,
   }) => {
@@ -98,14 +100,16 @@ test.describe("with no connection", () => {
       .getByRole("dialog")
       .getByRole("button", { name: "Undo check-in" })
       .click();
+
+    // As far as the server will ever know, the scan never happened: nothing is left to send.
     await expect(
-      page.getByText("Undo saved. It syncs when you're back online."),
+      page.getByText("Check-in undone for Omar Haddad."),
     ).toBeVisible();
     await expect(countLine(page)).toHaveText("5 of 9 checked in");
-    await expect(waiting(page, 2)).toBeVisible();
+    await expect(allSaved(page)).toBeVisible();
 
     await context.setOffline(false);
-    await expect(allSaved(page)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Online", { exact: true })).toBeVisible();
     expect((await registrationOf("1007", "rehearsal"))?.checkedInAt).toBeNull();
     await expect(countLine(page)).toHaveText("5 of 9 checked in");
   });
@@ -127,7 +131,7 @@ test.describe("with no connection", () => {
     );
     await context.setOffline(false);
 
-    const banner = page.getByRole("region", { name: /couldn't be saved/ });
+    const banner = page.getByRole("alert", { name: /couldn't be saved/ });
     await expect(banner).toBeVisible({ timeout: 20_000 });
     await expect(banner).toContainText("فاطمة الزهراء");
     await expect(banner).toContainText("Access revoked");
@@ -153,9 +157,7 @@ test.describe("with no connection", () => {
     await context.setOffline(false);
     await expect(page).toHaveURL(/\/login$/, { timeout: 20_000 });
 
-    await page.getByLabel("Username").fill("sara");
-    await page.getByLabel("Password").fill("sara-demo-pw");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await fillSignIn(page, "sara");
 
     await expect(allSaved(page)).toBeVisible({ timeout: 20_000 });
     expect(await registrationOf("1007", "rehearsal")).toMatchObject({
@@ -178,21 +180,28 @@ test.describe("with no connection", () => {
     await expect(page).toHaveURL(/\/login$/, { timeout: 20_000 });
 
     // Omar picks up the phone. Sara's scan stays hers to send.
-    await page.getByLabel("Username").fill("omar");
-    await page.getByLabel("Password").fill("omar-demo-pw");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await fillSignIn(page, "omar");
     await expect(
       page.getByText(/1 change from another admin is waiting on this phone/),
     ).toBeVisible();
-    await page.waitForTimeout(1500);
+    // Give the app every chance to send it: it re-reads the list whenever it
+    // comes back online, and sends what is waiting at the same moment.
+    const scansSent: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().endsWith("/api/scans")) scansSent.push(request.url());
+    });
+    const listRefreshed = page.waitForResponse((r) =>
+      r.url().endsWith("/api/roster"),
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await listRefreshed;
+    expect(scansSent).toEqual([]);
     expect((await registrationOf("1007", "rehearsal"))?.checkedInAt).toBeNull();
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/login$/);
 
-    await page.getByLabel("Username").fill("sara");
-    await page.getByLabel("Password").fill("sara-demo-pw");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await fillSignIn(page, "sara");
     await expect(allSaved(page)).toBeVisible({ timeout: 20_000 });
     expect(await registrationOf("1007", "rehearsal")).toMatchObject({
       by: "Sara",
@@ -228,12 +237,7 @@ test.describe("with no connection", () => {
     context,
   }) => {
     // Let the service worker take over and the saved copy be written.
-    await page.evaluate(() =>
-      navigator.serviceWorker.ready.then(() => undefined),
-    );
-    await page.waitForFunction(
-      () => localStorage.getItem("scanner.cache") !== null,
-    );
+    await waitForSavedCopy(page, "/api/roster");
     await page.reload();
     await expect(countLine(page)).toHaveText("5 of 9 checked in");
 
@@ -263,12 +267,7 @@ test.describe("with no connection", () => {
     page,
     context,
   }) => {
-    await page.evaluate(() =>
-      navigator.serviceWorker.ready.then(() => undefined),
-    );
-    await page.waitForFunction(
-      () => localStorage.getItem("scanner.cache") !== null,
-    );
+    await waitForSavedCopy(page, "/api/roster");
     await page.reload();
     await expect(countLine(page)).toBeVisible();
 

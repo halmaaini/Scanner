@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { NOTICE_MS } from "@/config";
 
 interface NoticeProps {
   message: string | null;
@@ -7,11 +8,17 @@ interface NoticeProps {
 
 /** A short message at the bottom of the screen that clears itself. */
 export function Notice({ message, onDone }: NoticeProps) {
+  // The timer must not restart every time the screen re-renders with a new callback.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  });
+
   useEffect(() => {
     if (!message) return;
-    const timer = setTimeout(onDone, 4_500);
+    const timer = setTimeout(() => onDoneRef.current(), NOTICE_MS);
     return () => clearTimeout(timer);
-  }, [message, onDone]);
+  }, [message]);
 
   return (
     <div
