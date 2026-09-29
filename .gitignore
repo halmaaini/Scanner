@@ -13,6 +13,7 @@ backup-*.sql
 students*.csv
 my-changes.sql
 attendance-*.csv
+attached_assets/*.csv
 
 # environment (never commit secrets)
 .env
