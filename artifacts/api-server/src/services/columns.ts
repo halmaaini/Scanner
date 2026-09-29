@@ -33,6 +33,7 @@ export const eventColumns = {
 export const studentColumns = {
   studentId: studentsTable.studentId,
   fullName: studentsTable.fullName,
+  major: studentsTable.major,
   isActive: studentsTable.isActive,
 };
 

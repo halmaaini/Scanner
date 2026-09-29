@@ -138,6 +138,7 @@ export const m = {
 
   results: {
     scanNext: "Scan next",
+    major: "Major",
     undo: "Undo check-in",
     undoing: "Undoing…",
     event: "Event",
@@ -186,6 +187,7 @@ export const m = {
 
   report: {
     role: "Super admin",
+    major: "Major",
     title: "Attendance",
     scanner: "Scanner",
     loading: "Loading the report…",
@@ -215,6 +217,7 @@ export const m = {
   },
 
   card: {
+    major: "Major",
     qrCaption: "Show this QR to the staff at each event",
     qrLabel: (id: string) => `QR code for student ${id}`,
     attendance: "Your attendance",

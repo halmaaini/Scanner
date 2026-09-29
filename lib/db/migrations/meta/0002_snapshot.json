@@ -1,6 +1,6 @@
 {
-  "id": "cd383886-17f2-4bd0-9995-8a84acb5e4b1",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "1867f10c-be3b-4957-8b6b-4e9f40f024fd",
+  "prevId": "ab67fde1-0ada-410a-bd76-2a377d1239e4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -50,7 +50,7 @@
       "checkConstraints": {
         "events_id_check": {
           "name": "events_id_check",
-          "value": "\"events\".\"id\" ~ '^[a-z0-9][a-z0-9_-]*$'"
+          "value": "char_length(\"events\".\"id\") <= 64 and \"events\".\"id\" ~ '^[a-z0-9][a-z0-9_-]*$'"
         },
         "events_name_check": {
           "name": "events_name_check",
@@ -311,6 +311,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "major": {
+          "name": "major",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_active": {
           "name": "is_active",
           "type": "boolean",
@@ -334,7 +340,7 @@
       "checkConstraints": {
         "students_student_id_check": {
           "name": "students_student_id_check",
-          "value": "char_length(\"students\".\"student_id\") between 1 and 64 and \"students\".\"student_id\" is nfkc normalized and \"students\".\"student_id\" !~ '[\\u0009-\\u000d\\u0020\\u0085\\u00a0\\u00ad\\u061c\\u1680\\u180e\\u2000-\\u200f\\u2028-\\u202f\\u205f-\\u206f\\u3000\\ufeff\\u0660-\\u0669\\u06f0-\\u06f9]'"
+          "value": "char_length(\"students\".\"student_id\") between 1 and 64 and \"students\".\"student_id\" is nfkc normalized and \"students\".\"student_id\" !~ '[\\u0000-\\u001f\\u0020\\u007f-\\u009f\\u00a0\\u00ad\\u034f\\u061c\\u115f-\\u1160\\u1680\\u17b4-\\u17b5\\u180b-\\u180f\\u2000-\\u200f\\u2028-\\u202f\\u205f-\\u206f\\u3000\\u3164\\ufe00-\\ufe0f\\ufeff\\uffa0\\ufff0-\\ufff8\\u0660-\\u0669\\u06f0-\\u06f9]'"
         },
         "students_full_name_check": {
           "name": "students_full_name_check",

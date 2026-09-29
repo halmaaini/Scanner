@@ -135,7 +135,12 @@ export function describeResult(context: Context): ResultDescription {
     ...base,
     name: result.student?.fullName ?? m.results.unknownName,
     idLine: m.results.studentLine(result.studentId),
-    rows: rowsFor(context),
+    rows: [
+      ...(result.student?.major
+        ? [{ label: m.results.major, value: result.student.major }]
+        : []),
+      ...rowsFor(context),
+    ],
     ...(offline ? { offlineNote: offlineNoteFor(result) } : {}),
   };
 }

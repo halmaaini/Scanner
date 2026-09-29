@@ -6,13 +6,29 @@ describe("buildAttendanceCsv", () => {
   it("writes one row per registration with attendance, time, scanner and access", () => {
     const lines = buildAttendanceCsv(makeRoster()).trimEnd().split("\r\n");
     expect(lines).toEqual([
-      "student_id,name,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access",
-      "1001,Layla Hassan,Rehearsal,yes,2026-06-11 09:14:00,2026-06-11T09:14:00.000Z,Sara,active",
-      "1002,Yusuf Ibrahim,Rehearsal,no,,,,active",
-      "1001,Layla Hassan,Graduation,no,,,,active",
-      "1002,Yusuf Ibrahim,Graduation,no,,,,active",
-      "1003,Karim Nasser,Graduation,yes,2026-06-12 09:00:00,2026-06-12T09:00:00.000Z,Omar,revoked",
+      "student_id,name,major,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access",
+      "1001,Layla Hassan,,Rehearsal,yes,2026-06-11 09:14:00,2026-06-11T09:14:00.000Z,Sara,active",
+      "1002,Yusuf Ibrahim,,Rehearsal,no,,,,active",
+      "1001,Layla Hassan,,Graduation,no,,,,active",
+      "1002,Yusuf Ibrahim,,Graduation,no,,,,active",
+      "1003,Karim Nasser,,Graduation,yes,2026-06-12 09:00:00,2026-06-12T09:00:00.000Z,Omar,revoked",
     ]);
+  });
+
+  it("exports majors and keeps spreadsheet formulas in majors inert", () => {
+    const roster = makeRoster({
+      students: [
+        { studentId: "1", fullName: "Layla", major: "Engineering", isActive: true },
+        { studentId: "2", fullName: "Nour", major: '=HYPERLINK("http://x")', isActive: true },
+      ],
+      registrations: [
+        { studentId: "1", eventId: "graduation", checkedInAt: null, checkedInBy: null },
+        { studentId: "2", eventId: "graduation", checkedInAt: null, checkedInBy: null },
+      ],
+    });
+    const csv = buildAttendanceCsv(roster);
+    expect(csv).toContain("1,Layla,Engineering,Graduation");
+    expect(csv).toContain("'=HYPERLINK");
   });
 
   it("quotes names that contain commas or quotes", () => {

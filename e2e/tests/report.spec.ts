@@ -63,13 +63,13 @@ test.describe("the super admin's report", () => {
     const text = readFileSync((await download.path())!, "utf8");
     expect(
       text.startsWith(
-        "\ufeffstudent_id,name,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access\r\n",
+        "\ufeffstudent_id,name,major,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access\r\n",
       ),
     ).toBe(true);
-    expect(text).toContain("1001,Layla Hassan,Rehearsal,yes,");
+    expect(text).toContain("1001,Layla Hassan,,Rehearsal,yes,");
     expect(text).toContain(",Sara,active");
     expect(text).toContain(
-      "1003,Karim Nasser,Graduation ceremony,no,,,,revoked",
+      "1003,Karim Nasser,,Graduation ceremony,no,,,,revoked",
     );
     expect(text).toContain("أحمد الفاطمي");
     // Nine students on two events plus three on the trophy list, and the revoked one on two.

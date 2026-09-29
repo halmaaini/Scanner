@@ -352,6 +352,9 @@ components:
           type: string
         fullName:
           type: string
+        major:
+          type: [string, "null"]
+          description: Field of study, when supplied by the roster. May be absent from older offline copies.
         isActive:
           type: boolean
           description: False once the student's access has been revoked.
@@ -498,6 +501,9 @@ components:
           type: string
         fullName:
           type: string
+        major:
+          type: [string, "null"]
+          description: Field of study, when supplied by the roster.
         isActive:
           type: boolean
         events:

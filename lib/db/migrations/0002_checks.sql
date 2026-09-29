@@ -1,0 +1,4 @@
+ALTER TABLE "events" DROP CONSTRAINT "events_id_check";--> statement-breakpoint
+ALTER TABLE "students" DROP CONSTRAINT "students_student_id_check";--> statement-breakpoint
+ALTER TABLE "events" ADD CONSTRAINT "events_id_check" CHECK (char_length("events"."id") <= 64 and "events"."id" ~ '^[a-z0-9][a-z0-9_-]*$');--> statement-breakpoint
+ALTER TABLE "students" ADD CONSTRAINT "students_student_id_check" CHECK (char_length("students"."student_id") between 1 and 64 and "students"."student_id" is nfkc normalized and "students"."student_id" !~ '[\u0000-\u001f\u0020\u007f-\u009f\u00a0\u00ad\u034f\u061c\u115f-\u1160\u1680\u17b4-\u17b5\u180b-\u180f\u2000-\u200f\u2028-\u202f\u205f-\u206f\u3000\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8\u0660-\u0669\u06f0-\u06f9]');

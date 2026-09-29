@@ -16,6 +16,8 @@ else (import, revoke, open events, create admins) is SQL; see `docs/admin-sql.md
 - `pnpm --filter @workspace/db run generate`: write a new SQL migration after a schema change (Claude does this; you do not need to).
 - `pnpm --filter @workspace/scripts run sql <file.sql>`: run a SQL file (no TTY needed) against `DATABASE_URL` (in a workspace shell, the **development** database). It prints `SELECT` results. `lib/db/sql/seed-demo.sql` is development-only demo data and refuses to load into a database that holds anything else.
 
+The student roster can include a nullable `major` column. It appears on the public card for anyone who knows the student ID, the staff scan result, the report search results, and the CSV export. Keep real roster CSVs outside the project directory so they cannot be committed to Git.
+
 Environment:
 
 | Variable                             | Meaning                                                                        |
@@ -93,17 +95,13 @@ they say):
    `sid` cookie with `Secure` (browser developer tools, Application, Cookies):
    the API relies on Replit's proxy sending `X-Forwarded-Proto: https`.
 
-## Handoff protocol (Claude ⇄ Replit)
+## Working with Claude Code
 
-This repo is worked by two agents that hand off through committed markdown.
-
-- **Claude Code** makes code changes, pushes them, and writes a handoff at `Claude Handoffs/NNN-slug.md`: the commit hash plus the exact runtime steps you must run.
-- **You (Replit agent)**, when the user says _"read NNN-xxx.md"_: pull the branch named in that handoff, follow it (install, restart, **publish**), then **write your report** to `Replit Handoffs/NNN-slug.md` (same number + slug) using `Replit Handoffs/_TEMPLATE.md`.
-- Your report covers: each step's result (✅/❌), any commits you made, publish status, the verification outcome, and **open questions / next instructions for Claude**. Keep it self-contained; Claude reads only that one file.
-- `HANDOFFS.md` shows each round's **Status**. **Act only on rounds marked `📤 pending Replit`**; while a round is `🚧 in progress (Claude)`, wait. After you verify live and deploy, set the row to `✅ done & deployed`.
-- **Net-new issues or specs** (a bug you found, a new feature) go in `Replit Requests/NNN-slug.md` using `Replit Requests/_TEMPLATE.md`, not in a round report.
-
-Always write the report and update the ledger; that is how Claude picks up the next round.
+- Claude Code builds features on GitHub branches and talks to you through the connector (short questions and requests). You run the app, check it, make small fixes, and report what you see: as a reply, or as a file in `Replit Requests/`.
+- Git: `main` is what you run. To take Claude's work, fetch and merge `main` (`[postMerge]` runs `pnpm install`). Push your own changes to a `replit/<topic>` branch, or to `main` after merging the latest; never force-push. If the owner asks you directly for a feature, push it the same way and tell Claude, so both work from the same code.
+- **Never commit real data**: the graduate roster CSVs (`attached_assets`), exports, dumps, password hashes. Load such files into the development database only, and keep them out of Git.
+- Ask the owner before publishing, writing to Production, or anything about billing or accounts.
+- The API applies migrations when it starts. Never edit a migration that has run; add a new one.
 
 ## Stack
 

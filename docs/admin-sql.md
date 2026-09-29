@@ -199,38 +199,43 @@ DELETE FROM events WHERE id = 'workshop';
 
 ### Import
 
-Add students (re-running it updates names, so it is safe to repeat). This works
-in any SQL runner, Production included:
+Add students (re-running it updates names and majors, so it is safe to repeat).
+Leave the major `NULL` when the roster does not supply one. This works in any
+SQL runner, Production included:
 
 ```sql
-INSERT INTO students (student_id, full_name) VALUES
-  ('1011', 'Hanan Said'),
-  ('1012', 'خالد المصري'),
-  ('1013', 'Tariq Anwar')
-ON CONFLICT (student_id) DO UPDATE SET full_name = EXCLUDED.full_name;
+INSERT INTO students (student_id, full_name, major) VALUES
+  ('1011', 'Hanan Said', 'Engineering'),
+  ('1012', 'خالد المصري', NULL),
+  ('1013', 'Tariq Anwar', 'Business')
+ON CONFLICT (student_id) DO UPDATE
+  SET full_name = EXCLUDED.full_name, major = EXCLUDED.major;
 ```
 
-**From a spreadsheet**, with the ID in column A and the name in column B, put
-this formula in a third column and copy it down (it doubles any `'` in a name):
+**From a spreadsheet**, with the ID in column A, the name in column B and the
+major in column C, put this formula in a fourth column and copy it down (it
+doubles any `'`; use `NULL` instead of `''` for a missing major):
 
-`="('"&A2&"', '"&SUBSTITUTE(B2,"'","''")&"'),"`
+`="('"&A2&"', '"&SUBSTITUTE(B2,"'","''")&"', '"&SUBSTITUTE(C2,"'","''")&"'),"`
 
 Paste the resulting lines in place of the three example lines above, then
 **delete the comma at the end of the very last line**. That line ends with the
-closing `)`, with no comma and no `;`, and the `ON CONFLICT` line stays under
+closing `)`, with no comma and no `;`, and the `ON CONFLICT` lines stay under
 it. It is one statement, so it either imports everyone or no one.
 
 If the statement stops with `students_student_id_check`, the message shows the
 row that broke the rule (`Failing row contains (...)`): fix that ID (see rule 1)
-and run the statement again.
+and run the statement again. If it says "cannot affect row a second time", an
+ID appears twice in your list.
 
 If you have a terminal and a **Development or local** database (in a Replit
 workspace terminal `psql` reaches Development only, so this does not load the
-live site), save the spreadsheet as CSV (UTF-8) with the columns `student_id`
-and `full_name`, keep the file in your home folder, and use psql's `\copy`:
+live site), save the spreadsheet as CSV (UTF-8) with the columns `student_id`,
+`full_name` and `major`, keep the file in your home folder, and use psql's
+`\copy` (an empty major imports as `NULL`):
 
 ```bash
-psql "$DATABASE_URL" -c "\copy students (student_id, full_name) FROM '$HOME/students.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
+psql "$DATABASE_URL" -c "\copy students (student_id, full_name, major) FROM '$HOME/students.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
 ```
 
 A new student is on **no** event list yet; see [Event lists](#event-lists).
@@ -344,7 +349,7 @@ only ever stores the hash.
 ### Create an account
 
 Set the username, the name shown on screen and the role (`'admin'` scans and
-can undo their own check-ins; `'super'` also opens the report). The database
+can undo their own check-ins; `'super'` also opens the report and can undo anyone's check-in). The database
 makes up the password and shows it to you **once**, in the result: read it from
 there and pass it on. It cannot be shown again; reset the password to get a new
 one. It is a single statement, so it works in any SQL runner, and if the
@@ -401,7 +406,7 @@ WITH new AS (SELECT encode(gen_random_bytes(8), 'hex') AS password),
        UPDATE staff
        SET password_hash = crypt(new.password, gen_salt('bf', 10))
        FROM new
-       WHERE lower(staff.username) = 'dina'
+       WHERE lower(staff.username) = lower('dina')
        RETURNING staff.username
      )
 SELECT changed.username, new.password
@@ -435,19 +440,19 @@ Change a display name or role (takes effect on their next request):
 
 ```sql
 UPDATE staff SET display_name = 'Nadia K.', role = 'super'
-WHERE lower(username) = 'nadia';
+WHERE lower(username) = lower('nadia');
 ```
 
 Deactivate someone (signs them out at once, keeps their history):
 
 ```sql
-UPDATE staff SET is_active = false WHERE lower(username) = 'nadia';
+UPDATE staff SET is_active = false WHERE lower(username) = lower('nadia');
 ```
 
 Reactivate them:
 
 ```sql
-UPDATE staff SET is_active = true WHERE lower(username) = 'nadia';
+UPDATE staff SET is_active = true WHERE lower(username) = lower('nadia');
 ```
 
 Changing a password does not end sessions that are already open. To sign one
@@ -455,7 +460,7 @@ person out everywhere:
 
 ```sql
 DELETE FROM sessions
-WHERE (sess::jsonb ->> 'staffId')::int = (SELECT id FROM staff WHERE lower(username) = 'nadia');
+WHERE (sess::jsonb ->> 'staffId')::int = (SELECT id FROM staff WHERE lower(username) = lower('nadia'));
 ```
 
 To sign **everyone** out (each person just signs in again):

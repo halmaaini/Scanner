@@ -25,6 +25,7 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
   let checkSchema: Migrate["checkSchema"];
   let resetDatabase: Testing["resetDatabase"];
   const scratchFolders: string[] = [];
+  let journalLength = 0;
 
   beforeAll(async () => {
     ({ pool, runMigrations } = await import("./index"));
@@ -33,7 +34,10 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
   });
 
   // Every test starts from a fully migrated database.
-  beforeEach(() => resetDatabase(migrationsFolder));
+  beforeEach(async () => {
+    await resetDatabase(migrationsFolder);
+    journalLength = (await journal()).length;
+  });
 
   afterAll(async () => {
     await pool?.end();
@@ -71,22 +75,23 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
     const journalFile = path.join(folder, "meta/_journal.json");
     const entries = JSON.parse(readFileSync(journalFile, "utf8"));
     const last = entries.entries.at(-1);
+    const number = String(last.idx + 1).padStart(4, "0");
     entries.entries.push({
       idx: last.idx + 1,
       version: last.version,
       when: last.when + 1000,
-      tag: "0001_more",
+      tag: `${number}_more`,
       breakpoints: true,
     });
     writeFileSync(journalFile, JSON.stringify(entries));
     writeFileSync(
-      path.join(folder, "0001_more.sql"),
+      path.join(folder, `${number}_more.sql`),
       steps.join("\n--> statement-breakpoint\n"),
     );
     // These steps add no table, index or constraint, so the snapshot is the same.
     copyFileSync(
-      path.join(folder, "meta/0000_snapshot.json"),
-      path.join(folder, "meta/0001_snapshot.json"),
+      path.join(folder, `meta/${last.tag.split("_")[0]}_snapshot.json`),
+      path.join(folder, `meta/${number}_snapshot.json`),
     );
     return folder;
   }
@@ -131,7 +136,8 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
     await dropMigrationRecord();
 
     const result = await runMigrations(migrationsFolder);
-    expect(result.outcome).toBe("adopted");
+    // The later steps that only change a check still run: the copy left those as they were.
+    expect(result.outcome).toBe("migrated");
     expect(result.alreadyInPlace).toContain('CREATE TABLE "students" (');
 
     // Nothing was recreated, and the record is what a real run leaves behind.
@@ -208,7 +214,7 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
       alreadyInPlace: [],
     });
     expect(await defaultOf("students", "is_active")).toBe("false");
-    expect(await journal()).toHaveLength(2);
+    expect(await journal()).toHaveLength(journalLength + 1);
     expect((await runMigrations(folder)).outcome).toBe("up-to-date");
   });
 
@@ -221,7 +227,7 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
       alreadyInPlace: [ADD_NOTE],
     });
     expect(await defaultOf("students", "is_active")).toBe("false");
-    expect(await journal()).toHaveLength(2);
+    expect(await journal()).toHaveLength(journalLength + 1);
   });
 
   it("only records a later migration whose steps a copy has all made", async () => {
@@ -232,7 +238,7 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
       outcome: "adopted",
       alreadyInPlace: [ADD_NOTE],
     });
-    expect(await journal()).toHaveLength(2);
+    expect(await journal()).toHaveLength(journalLength + 1);
   });
 
   it("stops on any other error and changes nothing", async () => {
@@ -243,7 +249,7 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
 
     await expect(runMigrations(folder)).rejects.toThrow(/nonsense_type/);
     expect(await defaultOf("students", "is_active")).toBe("true");
-    expect(await journal()).toHaveLength(1);
+    expect(await journal()).toHaveLength(journalLength);
   });
 
   it("creates the pgcrypto extension itself", async () => {

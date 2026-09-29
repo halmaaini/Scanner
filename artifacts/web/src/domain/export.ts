@@ -11,6 +11,7 @@ import { indexRoster, type Roster } from "./roster";
 const HEADER = [
   "student_id",
   "name",
+  "major",
   "event",
   "attended",
   "checked_in_at",
@@ -38,6 +39,7 @@ export function buildAttendanceCsv(roster: Roster): string {
     rows.push([
       student.studentId,
       student.fullName,
+      student.major ?? "",
       event.name,
       r.checkedInAt ? "yes" : "no",
       r.checkedInAt ? formatSpreadsheetTime(r.checkedInAt) : "",
