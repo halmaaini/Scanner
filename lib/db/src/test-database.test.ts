@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { assertScratchDatabase, selectTestDatabase } from "./test-database";
+import {
+  assertScratchDatabase,
+  assertScratchName,
+  selectTestDatabase,
+} from "./test-database";
 
 const original = {
   test: process.env.TEST_DATABASE_URL,
@@ -14,6 +18,20 @@ afterEach(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
+});
+
+describe("assertScratchName", () => {
+  it("accepts a name that says the database is for tests", () => {
+    for (const name of ["scanner_test", "TEST", "test-db"]) {
+      expect(() => assertScratchName(name)).not.toThrow();
+    }
+  });
+
+  it("refuses any other name, including none", () => {
+    for (const name of ["heliumdb", "postgres", ""]) {
+      expect(() => assertScratchName(name)).toThrow(/must contain "test"/);
+    }
+  });
 });
 
 describe("assertScratchDatabase", () => {

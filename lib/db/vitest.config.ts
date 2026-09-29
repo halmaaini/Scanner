@@ -1,4 +1,7 @@
+import { warnIfDatabaseTestsSkipped } from "./src/test-database";
 import { defineConfig } from "vitest/config";
+
+warnIfDatabaseTestsSkipped();
 
 export default defineConfig({
   test: {

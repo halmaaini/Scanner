@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { STORAGE_KEYS } from "@/config";
 import type { Event } from "@/domain/roster";
+import { resolveSelectedEvent } from "@/domain/selectedEvent";
 import { appStorage } from "@/lib/storage";
 
 export interface SelectedEvent {
@@ -17,25 +18,24 @@ export interface SelectedEvent {
 /**
  * The event being scanned for. Remembered on the device, so a scanner that is
  * reopened keeps pointing at the same event; falls back to the first open one
- * when the remembered event is gone or closed, and says so (`replaced`), so no
- * one keeps scanning into a different event without noticing.
+ * when the remembered event is gone or closed, and says so (`replaced`).
  */
 export function useSelectedEvent(openEvents: readonly Event[]): SelectedEvent {
   const [remembered, setRemembered] = useState(() =>
     appStorage.getItem(STORAGE_KEYS.selectedEvent),
   );
+  const { eventId, replaced } = resolveSelectedEvent(openEvents, remembered);
 
-  const stillOpen = openEvents.some((e) => e.id === remembered);
-  const eventId = stillOpen ? (remembered ?? undefined) : openEvents[0]?.id;
-
-  function choose(chosen: string) {
+  const choose = useCallback((chosen: string) => {
     setRemembered(chosen);
     appStorage.setItem(STORAGE_KEYS.selectedEvent, chosen);
-  }
+  }, []);
 
-  return {
-    eventId,
-    choose,
-    replaced: remembered && !stillOpen && eventId ? remembered : null,
-  };
+  // Nothing was ever chosen, so the first open event is in use. Remember it
+  // like a choice: when it closes, that is then noticed too.
+  useEffect(() => {
+    if (remembered === null && eventId) choose(eventId);
+  }, [remembered, eventId, choose]);
+
+  return { eventId, choose, replaced };
 }

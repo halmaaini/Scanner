@@ -255,6 +255,35 @@ describe("submitUndo", () => {
     ]);
   });
 
+  it("queues the undo behind a scan whose request timed out: the server may have recorded it", async () => {
+    const { deps, scan, outbox, api } = setup({
+      submitScans: async () => {
+        throw new DOMException("Request timed out", "TimeoutError");
+      },
+      undoCheckIn: async () => {
+        throw networkError();
+      },
+    });
+    const response = await scan("1002");
+    expect(response).toMatchObject({ kind: "offline" });
+
+    const undone = await submitUndo(deps, {
+      studentId: "1002",
+      eventId: "graduation",
+      staffId: 2,
+      scanOpId: (response as { opId: string }).opId,
+    });
+
+    // Not taken back as if it never happened: the undo goes in behind the scan.
+    expect(undone).toEqual({ kind: "queued" });
+    expect(outbox.getState().ops.map((op) => op.type)).toEqual([
+      "scan",
+      "undo",
+    ]);
+    // It waits its turn: nothing goes out ahead of the scan that could not be sent.
+    expect(api.undoCheckIn).not.toHaveBeenCalled();
+  });
+
   it("reports an undo the server refuses", async () => {
     const { deps } = setup({
       undoCheckIn: async () => {

@@ -42,8 +42,9 @@ export const SYNC_INTERVAL_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
- * A scan or undo slower than this counts as "no connection": it stays queued
- * and the person sees the offline answer. Short, because someone is waiting.
+ * A scan or undo that a person is waiting on, slower than this, counts as "no
+ * connection": it stays queued and the person sees the offline answer. Short,
+ * because someone is waiting; background sends get REQUEST_TIMEOUT_MS.
  */
 export const SCAN_TIMEOUT_MS = 5_000;
 
@@ -58,6 +59,15 @@ export const SAME_CODE_COOLDOWN_MS = 2_000;
 
 /** How long a short message stays at the bottom of the screen. */
 export const NOTICE_MS = 4_500;
+
+/** How long a downloaded file is kept available to the browser before it is released. */
+export const RELEASE_DOWNLOAD_MS = 60_000;
+
+/** How many problems the "couldn't be saved" banner lists before "…and N more". */
+export const LISTED_ISSUES = 5;
+
+/** The browser lock that lets one tab or window at a time send the saved changes. */
+export const SYNC_LOCK_NAME = "scanner.sync";
 
 /** Where things are kept in the browser. */
 export const STORAGE_KEYS = {

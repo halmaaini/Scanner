@@ -4,23 +4,29 @@ import {
   getGetRosterQueryKey,
   submitScans,
   undoCheckIn,
-  type Roster,
 } from "@workspace/api-client-react";
 import { SCAN_TIMEOUT_MS, STORAGE_KEYS } from "@/config";
-import { replaceRegistrations } from "@/domain/roster";
 import { isOnline, reportReachable } from "@/lib/network";
 import { queryClient } from "@/lib/queryClient";
 import { appStorage } from "@/lib/storage";
 import { exclusiveAcrossTabs } from "./lock";
 import { createOutbox } from "./outbox";
+import { foldIntoRoster } from "./roster";
 import { submitScan, submitUndo, type ScanInput } from "./submit";
 import { createSyncEngine } from "./sync";
 
-/** A scan or undo slower than SCAN_TIMEOUT_MS is treated as "no connection". */
+/**
+ * A scan or undo a person is waiting on counts as "no connection" after
+ * SCAN_TIMEOUT_MS, so the screen answers quickly. A background send may take
+ * as long as any request: a long backlog is slow to record, and giving up on
+ * it early would only make it start over.
+ */
 async function bounded<T>(
   signal: AbortSignal,
+  interactive: boolean,
   request: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
+  if (!interactive) return request(signal);
   const limited = abortAfter(SCAN_TIMEOUT_MS, signal);
   try {
     return await request(limited.signal);
@@ -35,15 +41,15 @@ export const outbox = createOutbox(appStorage, STORAGE_KEYS.outbox);
 export const syncEngine = createSyncEngine({
   outbox,
   api: {
-    submitScans: async (scans, signal) =>
+    submitScans: async (scans, signal, interactive) =>
       (
-        await bounded(signal, (limited) =>
+        await bounded(signal, interactive, (limited) =>
           submitScans({ scans }, { signal: limited }),
         )
       ).results,
     // The generated URL builders do not escape path parameters; IDs may contain "/".
-    undoCheckIn: (eventId, studentId, signal) =>
-      bounded(signal, (limited) =>
+    undoCheckIn: (eventId, studentId, signal, interactive) =>
+      bounded(signal, interactive, (limited) =>
         undoCheckIn(
           encodeURIComponent(eventId),
           encodeURIComponent(studentId),
@@ -52,16 +58,8 @@ export const syncEngine = createSyncEngine({
       ),
   },
   hooks: {
-    onRegistrations: async (registrations) => {
-      const key = getGetRosterQueryKey();
-      // A roster read that began before these answers came back would land
-      // after them and put the old rows back; call it off first.
-      await queryClient.cancelQueries({ queryKey: key });
-      queryClient.setQueryData<Roster>(
-        key,
-        (roster) => roster && replaceRegistrations(roster, registrations),
-      );
-    },
+    onRegistrations: (registrations) =>
+      foldIntoRoster(queryClient, registrations),
     onStale: () =>
       void queryClient.invalidateQueries({ queryKey: getGetRosterQueryKey() }),
     onUnauthorized: () =>

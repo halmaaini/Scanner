@@ -19,3 +19,10 @@ const GATEWAY_STATUSES = [502, 503, 504];
  */
 export const isNetworkError = (error: unknown) =>
   !(error instanceof ApiError) || GATEWAY_STATUSES.includes(error.status);
+
+/**
+ * `fetch` itself failed: no connection, or a host that cannot be reached. The
+ * request most likely never got there. A timeout, a dropped answer or a
+ * proxy's error page is different: the server may well have acted on it.
+ */
+export const failedToConnect = (error: unknown) => error instanceof TypeError;

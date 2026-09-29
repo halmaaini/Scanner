@@ -21,13 +21,16 @@ if (Number.isNaN(port) || port <= 0) {
 // the migrations next to the bundle; the same code runs in development and
 // production, so there is no separate migration step to forget.
 try {
-  const outcome = await runMigrations(path.join(__dirname, "migrations"));
+  const { outcome, alreadyInPlace } = await runMigrations(
+    path.join(__dirname, "migrations"),
+  );
   logger.info({ outcome }, "Database migrations are up to date");
-  if (outcome === "adopted") {
-    // Replit copies the development database's tables to production when
-    // publishing, so the migrations had nothing left to create.
+  if (alreadyInPlace.length > 0) {
+    // Replit copies the development database's structure to production when
+    // publishing, so some steps had nothing left to do.
     logger.info(
-      "The tables were already in place; the migrations were recorded, not run",
+      { alreadyInPlace },
+      "Some of the schema was already in place; those steps were skipped",
     );
   }
 } catch (err) {

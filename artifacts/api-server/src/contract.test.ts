@@ -1,4 +1,5 @@
 import {
+  MAX_EVENT_ID_LENGTH,
   MAX_SCANS_PER_REQUEST,
   MAX_STUDENT_ID_LENGTH,
 } from "@workspace/attendance";
@@ -17,12 +18,12 @@ import { describe, expect, it } from "vitest";
 describe("API contract matches the shared rules", () => {
   const atLimit = "1".repeat(MAX_STUDENT_ID_LENGTH);
   const overLimit = "1".repeat(MAX_STUDENT_ID_LENGTH + 1);
-  const scan = (studentId: string) => ({
+  const scan = (studentId: string, eventId = "graduation") => ({
     scans: [
       {
         id: crypto.randomUUID(),
         studentId,
-        eventId: "graduation",
+        eventId,
         scannedAt: new Date().toISOString(),
       },
     ],
@@ -40,6 +41,23 @@ describe("API contract matches the shared rules", () => {
     ).toBe(true);
     expect(
       UndoCheckInParams.safeParse({ eventId: "e", studentId: overLimit })
+        .success,
+    ).toBe(false);
+  });
+
+  it("accepts an event id of exactly the shared maximum length and no more", () => {
+    const atLimit = "e".repeat(MAX_EVENT_ID_LENGTH);
+    const overLimit = "e".repeat(MAX_EVENT_ID_LENGTH + 1);
+    expect(SubmitScansBody.safeParse(scan("1001", atLimit)).success).toBe(true);
+    expect(SubmitScansBody.safeParse(scan("1001", overLimit)).success).toBe(
+      false,
+    );
+    expect(
+      UndoCheckInParams.safeParse({ eventId: atLimit, studentId: "1001" })
+        .success,
+    ).toBe(true);
+    expect(
+      UndoCheckInParams.safeParse({ eventId: overLimit, studentId: "1001" })
         .success,
     ).toBe(false);
   });

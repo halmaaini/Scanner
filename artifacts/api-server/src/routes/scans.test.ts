@@ -1,6 +1,8 @@
 import { MAX_SCANS_PER_REQUEST } from "@workspace/attendance";
-import { expect, it } from "vitest";
+import { pool } from "@workspace/db";
+import { describe, expect, it } from "vitest";
 import {
+  type Client,
   addEvent,
   addStaff,
   addStudent,
@@ -11,6 +13,11 @@ import {
   scan,
   signIn,
 } from "../testing/helpers";
+
+/** What the lost-race tests use of a database connection. */
+interface Transaction {
+  query(text: string, values?: unknown[]): Promise<unknown>;
+}
 
 async function signedInAs(username: string) {
   const id = await addStaff(username, { displayName: username });
@@ -213,6 +220,94 @@ describeWithDb("scans", () => {
     expect(outcomes.filter((o) => o === "checked_in")).toHaveLength(1);
     expect(outcomes.filter((o) => o === "already_checked_in")).toHaveLength(11);
     expect((await registrationOf("1001", "graduation")).checkedInBy).toBe(id);
+    // Every answer, including the ones that lost the race, says who checked the student in.
+    for (const response of responses) {
+      expect(response.body.results[0].registration).toMatchObject({
+        checkedInBy: id,
+      });
+    }
+  });
+
+  // Another scanner changes the registration after this scan was read and
+  // before it is written. A row lock held here makes the server's write wait,
+  // so the change lands in exactly that gap.
+  describe("when the registration changes while a scan is being recorded", () => {
+    async function scanDuringChange(
+      client: Client,
+      change: (tx: Transaction) => Promise<unknown>,
+    ) {
+      const tx = await pool.connect();
+      try {
+        await tx.query("begin");
+        await tx.query(
+          "select 1 from registrations where student_id = '1001' and event_id = 'graduation' for update",
+        );
+        const response = Promise.resolve(
+          client
+            .post("/api/scans")
+            .send({ scans: [scan("1001", "graduation")] }),
+        );
+        await waitForBlockedWrite();
+        await change(tx);
+        await tx.query("commit");
+        return (await response).body.results[0];
+      } finally {
+        await tx.query("rollback").catch(() => undefined);
+        tx.release();
+      }
+    }
+
+    async function waitForBlockedWrite() {
+      for (let i = 0; i < 100; i++) {
+        const { rows } = await pool.query(
+          "select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+        );
+        if (rows[0].n > 0) return;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error("The scan's write never waited for the lock");
+    }
+
+    it("answers with what the other scanner recorded", async () => {
+      const { client } = await signedInAs("sara");
+      const omar = await addStaff("omar", { displayName: "Omar" });
+      await addEvent("graduation");
+      await addStudent("1001");
+      await register("1001", "graduation");
+
+      const result = await scanDuringChange(client, (tx) =>
+        tx.query(
+          "update registrations set checked_in_at = '2026-06-12T10:40:00Z', checked_in_by = $1 where student_id = '1001' and event_id = 'graduation'",
+          [omar],
+        ),
+      );
+
+      expect(result).toMatchObject({
+        outcome: "already_checked_in",
+        registration: {
+          checkedInBy: omar,
+          checkedInAt: "2026-06-12T10:40:00.000Z",
+        },
+      });
+    });
+
+    it("says the student is not registered when the place was removed", async () => {
+      const { client } = await signedInAs("sara");
+      await addEvent("graduation");
+      await addStudent("1001");
+      await register("1001", "graduation");
+
+      const result = await scanDuringChange(client, (tx) =>
+        tx.query(
+          "delete from registrations where student_id = '1001' and event_id = 'graduation'",
+        ),
+      );
+
+      expect(result).toMatchObject({
+        outcome: "not_registered",
+        registration: null,
+      });
+    });
   });
 
   it("scans for events regardless of the open switch", async () => {

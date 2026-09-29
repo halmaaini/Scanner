@@ -58,7 +58,8 @@ export function SyncStatus() {
           </button>
         )}
       </div>
-      {serverProblem && (
+      {/* Only while something is waiting: with nothing queued there is nothing to be sent later. */}
+      {serverProblem && waiting > 0 && (
         <p
           role="status"
           className="rounded-xl bg-warn-soft px-3.5 py-3 text-sm text-warn"

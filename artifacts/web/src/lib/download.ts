@@ -1,3 +1,5 @@
+import { RELEASE_DOWNLOAD_MS } from "@/config";
+
 /**
  * Saves text as a file. The byte-order mark makes Excel read the file as
  * UTF-8, which matters for Arabic names.
@@ -18,6 +20,3 @@ export function downloadTextFile(
   // of the file at once would cancel it.
   setTimeout(() => URL.revokeObjectURL(url), RELEASE_DOWNLOAD_MS);
 }
-
-/** How long a downloaded file is kept available to the browser before it is released. */
-const RELEASE_DOWNLOAD_MS = 60_000;

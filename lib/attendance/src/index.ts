@@ -1,3 +1,4 @@
+export { MAX_EVENT_ID_LENGTH } from "./eventId";
 export { can, canUndoCheckIn, type Permission } from "./permissions";
 export {
   evaluateScan,

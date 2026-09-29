@@ -1,3 +1,4 @@
+import { MAX_EVENT_ID_LENGTH } from "@workspace/attendance";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -26,7 +27,10 @@ export const eventsTable = pgTable(
       .defaultNow(),
   },
   (t) => [
-    check("events_id_check", sql`${t.id} ~ '^[a-z0-9][a-z0-9_-]*$'`),
+    check(
+      "events_id_check",
+      sql`char_length(${t.id}) <= ${sql.raw(String(MAX_EVENT_ID_LENGTH))} and ${t.id} ~ '^[a-z0-9][a-z0-9_-]*$'`,
+    ),
     check("events_name_check", sql`btrim(${t.name}) <> ''`),
   ],
 );

@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { readMigrationFiles } from "drizzle-orm/migrator";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { type MigrationMeta, readMigrationFiles } from "drizzle-orm/migrator";
+import { NodePgSession } from "drizzle-orm/node-postgres";
+import { PgDialect } from "drizzle-orm/pg-core";
 import type { Pool, PoolClient } from "pg";
 import { pool } from "./client";
 
 /**
  * Where drizzle records which migrations have run. These are its defaults,
- * spelled out because this file reads and writes that table as well.
+ * spelled out because this file reads that table.
  */
 export const MIGRATIONS_SCHEMA = "drizzle";
 const MIGRATIONS_TABLE = "__drizzle_migrations";
@@ -21,16 +21,24 @@ const MIGRATIONS_TABLE = "__drizzle_migrations";
  */
 const REQUIRED_EXTENSIONS = ["pgcrypto"] as const;
 
+/** Postgres error codes that say "that already exists": a table or index, a constraint, a column. */
+const ALREADY_EXISTS = new Set(["42P07", "42710", "42701"]);
+
 export type MigrationOutcome =
   /** Nothing was waiting. */
   | "up-to-date"
-  /** The waiting migrations ran. */
+  /** The waiting migrations ran (steps whose result was already there were skipped). */
   | "migrated"
-  /** The tables were already there (see below), so the migrations were only recorded. */
+  /** Every step's result was already there (see below), so the migrations were only recorded. */
   | "adopted";
 
+export interface MigrationResult {
+  outcome: MigrationOutcome;
+  /** The steps that were skipped because the database already had their result. */
+  alreadyInPlace: string[];
+}
+
 type Executor = Pick<Pool, "query">;
-type Migration = ReturnType<typeof readMigrationFiles>[number];
 
 /**
  * Brings the database up to date with the migrations in `migrationsFolder`.
@@ -40,15 +48,18 @@ type Migration = ReturnType<typeof readMigrationFiles>[number];
  * which they find nothing left to do. Needs no TTY, unlike `drizzle-kit push`.
  *
  * Replit copies the structure of the development database to production when
- * the app is published, so a brand-new production database can already hold
- * every table while this record is still empty. Running the migrations then
- * would fail on "already exists". When everything the latest migration
- * describes is already present, they are recorded as applied instead.
- * Migrations are therefore structure only; change data with SQL.
+ * the app is published, so tables, columns or indexes a waiting migration
+ * would create may be there before it runs. A step that fails only because its
+ * result already exists is skipped; every other step runs, so whatever the copy
+ * left out is still created and an in-place change (a new check, a default) is
+ * never lost. Afterwards the schema must match the latest migration or nothing
+ * is kept. Steps that only *remove* something are not covered: if the copy
+ * already removed it, that step fails loudly. Migrations are structure only;
+ * change data with SQL.
  */
 export async function runMigrations(
   migrationsFolder: string,
-): Promise<MigrationOutcome> {
+): Promise<MigrationResult> {
   const client = await pool.connect();
   try {
     await client.query(
@@ -58,30 +69,25 @@ export async function runMigrations(
       await client.query(`create extension if not exists "${extension}"`);
     }
 
-    const pending = await pendingMigrations(client, migrationsFolder);
-    if (pending.length === 0) return "up-to-date";
+    const pending = await pendingMigrations(
+      client,
+      readMigrationFiles({ migrationsFolder }),
+    );
+    if (pending.length === 0)
+      return { outcome: "up-to-date", alreadyInPlace: [] };
 
-    const { expected, missing } = await checkSchema(client, migrationsFolder);
-    if (missing.length === 0) {
-      await recordMigrations(client, pending);
-      return "adopted";
-    }
+    const alreadyInPlace = await applyMigrations(
+      client,
+      pending,
+      migrationsFolder,
+    );
+    await recordMigrations(client, pending, migrationsFolder);
 
-    try {
-      await migrate(drizzle(client), {
-        migrationsFolder,
-        migrationsSchema: MIGRATIONS_SCHEMA,
-        migrationsTable: MIGRATIONS_TABLE,
-      });
-    } catch (error) {
-      if (missing.length === expected.length) throw error;
-      // Some of the schema exists and some does not: creating it again cannot work.
-      throw new Error(
-        `The database already has part of the schema, so the migrations cannot create the rest. Missing: ${missing.join(", ")}`,
-        { cause: error },
-      );
-    }
-    return "migrated";
+    const steps = pending.reduce((count, { sql }) => count + sql.length, 0);
+    return {
+      outcome: alreadyInPlace.length < steps ? "migrated" : "adopted",
+      alreadyInPlace,
+    };
   } finally {
     try {
       await client.query(
@@ -93,46 +99,105 @@ export async function runMigrations(
   }
 }
 
-/** The migrations drizzle has not recorded yet (it applies those newer than the last one recorded). */
+/** The migrations newer than the last one recorded: the rule drizzle's own migrator uses. */
 async function pendingMigrations(
   client: PoolClient,
-  migrationsFolder: string,
-): Promise<Migration[]> {
-  const migrations = readMigrationFiles({ migrationsFolder });
-  await client.query(`create schema if not exists "${MIGRATIONS_SCHEMA}"`);
-  await client.query(
-    `create table if not exists "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" (id serial primary key, hash text not null, created_at bigint)`,
+  migrations: MigrationMeta[],
+): Promise<MigrationMeta[]> {
+  const journal = `"${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}"`;
+  const { rows: found } = await client.query<{ present: boolean }>(
+    "select to_regclass($1) is not null as present",
+    [journal],
   );
-  const { rows } = await client.query<{ created_at: string | null }>(
-    `select created_at from "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" order by created_at desc limit 1`,
+  if (!found[0]?.present) return migrations;
+
+  const { rows } = await client.query<{ last: string | null }>(
+    `select max(created_at) as last from ${journal}`,
   );
-  const last = rows[0]?.created_at;
+  const last = rows[0]?.last;
   return migrations.filter(
     (migration) => last == null || Number(last) < migration.folderMillis,
   );
 }
 
-/** Marks migrations as applied without running them, exactly as drizzle would after running them. */
-async function recordMigrations(
+/**
+ * Runs the steps in one transaction, so a failure leaves nothing half done,
+ * and returns the steps that were already in place.
+ */
+async function applyMigrations(
   client: PoolClient,
-  migrations: Migration[],
-): Promise<void> {
+  pending: MigrationMeta[],
+  migrationsFolder: string,
+): Promise<string[]> {
+  const alreadyInPlace: string[] = [];
   await client.query("begin");
   try {
-    for (const migration of migrations) {
-      await client.query(
-        `insert into "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" ("hash", "created_at") values ($1, $2)`,
-        [migration.hash, migration.folderMillis],
+    for (const { sql } of pending) {
+      for (const step of sql) {
+        // Without a savepoint one failed step would spoil the whole transaction.
+        await client.query("savepoint step");
+        try {
+          await client.query(step);
+        } catch (error) {
+          if (!isAlreadyThere(error)) throw error;
+          await client.query("rollback to savepoint step");
+          alreadyInPlace.push(headline(step));
+        }
+      }
+    }
+
+    const { missing } = await checkSchema(client, migrationsFolder);
+    if (missing.length > 0) {
+      throw new Error(
+        `The database already has part of the schema, and the migrations cannot complete it. Missing: ${missing.join(", ")}`,
       );
     }
     await client.query("commit");
   } catch (error) {
-    await client.query("rollback");
+    // The connection may be what failed; the original error is the one to report.
+    await client.query("rollback").catch(() => undefined);
     throw error;
   }
+  return alreadyInPlace;
 }
 
-// ---- Does the database already have the schema? -----------------------------
+/**
+ * Marks migrations as applied through drizzle's own bookkeeping: its migrator,
+ * handed the same migrations with nothing left to run.
+ */
+async function recordMigrations(
+  client: PoolClient,
+  migrations: MigrationMeta[],
+  migrationsFolder: string,
+): Promise<void> {
+  const dialect = new PgDialect();
+  await dialect.migrate(
+    migrations.map((migration) => ({ ...migration, sql: [] })),
+    new NodePgSession<Record<string, never>, Record<string, never>>(
+      client,
+      dialect,
+      undefined,
+    ),
+    {
+      migrationsFolder,
+      migrationsSchema: MIGRATIONS_SCHEMA,
+      migrationsTable: MIGRATIONS_TABLE,
+    },
+  );
+}
+
+function isAlreadyThere(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && ALREADY_EXISTS.has(code);
+}
+
+/** The first line of a step: enough to tell which one it was. */
+function headline(step: string): string {
+  const [firstLine = ""] = step.trim().split("\n");
+  return firstLine.trim().slice(0, 100);
+}
+
+// ---- Is the schema complete? ------------------------------------------------
 
 interface Snapshot {
   tables: Record<
@@ -208,7 +273,7 @@ const LIVE_OBJECTS = `
 /**
  * What the latest migration should have created (`expected`) and which of it
  * the database lacks (`missing`). Only presence by name is checked: enough to
- * tell "the migrations ran here" from "nothing is here" or "half of it is".
+ * tell a finished schema from one that is missing pieces.
  */
 export async function checkSchema(
   executor: Executor,

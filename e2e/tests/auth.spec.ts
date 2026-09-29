@@ -1,6 +1,8 @@
 import {
   STORAGE_KEYS,
   expect,
+  registrationOf,
+  scanById,
   signIn,
   test,
   waitForSavedCopy,
@@ -66,25 +68,36 @@ test.describe("signing in", () => {
   }) => {
     await signIn(page, "sara");
     await waitForSavedCopy(page, "/api/roster");
-    const saved = () =>
-      page.evaluate(
-        (key) => localStorage.getItem(key) ?? "",
-        STORAGE_KEYS.queryCache,
-      );
-    // Sanity: the phone does hold the names right now.
-    expect(await saved()).toContain("Layla Hassan");
+    // A scan that cannot get through stays waiting on the phone.
+    await page.route("**/api/scans", (route) => route.abort());
+    await scanById(page, "1007");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Scan next" })
+      .click();
 
+    const stored = (key: string) =>
+      page.evaluate((k) => localStorage.getItem(k) ?? "", key);
+    // Sanity: the phone holds the names, and the waiting scan, right now.
+    expect(await stored(STORAGE_KEYS.queryCache)).toContain("Layla Hassan");
+    expect(await stored(STORAGE_KEYS.outbox)).toContain("1007");
+
+    // It warns first that something has not been sent.
+    const warnings: string[] = [];
+    page.once("dialog", (dialog) => {
+      warnings.push(dialog.message());
+      void dialog.accept();
+    });
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/login$/);
+    expect(warnings).toHaveLength(1);
 
     // The saved copy is rewritten a moment after the change.
-    await expect.poll(saved).not.toContain("Layla Hassan");
-    expect(await saved()).not.toContain("/api/roster");
-    expect(
-      await page.evaluate(
-        (key) => localStorage.getItem(key),
-        STORAGE_KEYS.outbox,
-      ),
-    ).toBeNull();
+    await expect
+      .poll(() => stored(STORAGE_KEYS.queryCache))
+      .not.toContain("Layla Hassan");
+    expect(await stored(STORAGE_KEYS.queryCache)).not.toContain("/api/roster");
+    expect(await stored(STORAGE_KEYS.outbox)).toBe("");
+    expect((await registrationOf("1007", "rehearsal"))?.checkedInAt).toBeNull();
   });
 });

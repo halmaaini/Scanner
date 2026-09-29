@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import { useState, type FormEvent, type Ref } from "react";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
@@ -6,6 +7,8 @@ import { m } from "@/messages";
 interface ManualEntryProps {
   onSubmit: (studentId: string) => void;
   disabled?: boolean;
+  /** A scan is being checked; the button says so, whether or not there is a camera. */
+  checking?: boolean;
   /** Lets the screen put the cursor back in the field after a result. */
   inputRef?: Ref<HTMLInputElement>;
 }
@@ -17,6 +20,7 @@ interface ManualEntryProps {
 export function ManualEntry({
   onSubmit,
   disabled = false,
+  checking = false,
   inputRef,
 }: ManualEntryProps) {
   const [value, setValue] = useState("");
@@ -51,8 +55,20 @@ export function ManualEntry({
           spellCheck={false}
         />
       </div>
-      <Button type="submit" size="compact" disabled={disabled || !value.trim()}>
-        {m.scanner.checkIn}
+      <Button
+        type="submit"
+        size="compact"
+        disabled={disabled || !value.trim()}
+        aria-busy={checking}
+      >
+        {checking ? (
+          <>
+            <LoaderCircle className="size-4 animate-spin" aria-hidden />
+            {m.scanner.checking}
+          </>
+        ) : (
+          m.scanner.checkIn
+        )}
       </Button>
     </form>
   );

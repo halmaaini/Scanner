@@ -1,13 +1,11 @@
 import { TriangleAlert } from "lucide-react";
 import { buttonStyles } from "@/components/buttonStyles";
+import { LISTED_ISSUES } from "@/config";
 import { indexRoster, type Roster } from "@/domain/roster";
 import { useCurrentStaff } from "@/features/auth/StaffContext";
 import { m } from "@/messages";
 import { outbox } from "@/offline";
 import { useOutbox } from "@/offline/hooks";
-
-/** How many problems are listed before "…and N more". */
-const LISTED_ISSUES = 5;
 
 /**
  * Changes the server refused after they had been saved offline (for example a

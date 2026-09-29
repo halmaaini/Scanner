@@ -50,6 +50,11 @@ export function ScannerPage() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [checking, setChecking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // What the result screen shows now, for work that finishes after it has closed.
+  const shownAnswer = useRef<Answer | null>(null);
+  useEffect(() => {
+    shownAnswer.current = answer;
+  }, [answer]);
   // One scan at a time: the camera reports the same code many times a second.
   const busy = useRef(false);
   // After a typed ID, the cursor goes back to the field once the result is closed.
@@ -119,12 +124,13 @@ export function ScannerPage() {
 
   async function undo(): Promise<boolean> {
     if (!answer) return false;
-    const { studentId, eventId: undoEventId, student } = answer.result;
+    const undoing = answer;
+    const { studentId, eventId: undoEventId, student } = undoing.result;
     const response = await scanning.undo({
       studentId,
       eventId: undoEventId,
       staffId: staff.id,
-      scanOpId: answer.opId,
+      scanOpId: undoing.opId,
     });
     if (response.kind === "refused") return false;
     setNotice(
@@ -132,7 +138,9 @@ export function ScannerPage() {
         ? m.results.undone(student?.fullName ?? studentId)
         : m.results.undoQueued,
     );
-    next();
+    // The person may have moved on while this was under way: do not close the
+    // result they are looking at now.
+    if (shownAnswer.current === undoing) next();
     return true;
   }
 
@@ -251,6 +259,7 @@ export function ScannerPage() {
               inputRef={manualField}
               onSubmit={(id) => void scan(id, "typed")}
               disabled={answer !== null || checking}
+              checking={checking}
             />
           </>
         )}

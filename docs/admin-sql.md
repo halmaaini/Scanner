@@ -17,20 +17,21 @@ gives you several ways to do something, run only the one you need.
 The published site starts with **no accounts and no data**, so nobody can sign
 in until you have done this. Do it in order:
 
-1. **Publish the app first.** The database tables are created when the app
-   starts, so there is nothing to fill in before that.
+1. **Publish the app first**, and wait until the Replit agent reports that it
+   started. The database tables are created when the app starts, so there is
+   nothing to fill in before that.
 2. **Open the Production database** (see [Where to run SQL](#where-to-run-sql)).
-   The live site reads Production; the Development database is only the
-   workspace's own copy.
-3. **Create your super admin** with the block under
-   [Create an account](#create-an-account): type your own password where it
-   says so, and set `the_role` to `'super'`.
-4. **Create the events** ([Events](#events)) and **open** the ones people will
-   scan for.
+   The live site reads Production. Development is only the workspace's own
+   copy: whatever you do there, the live site never sees.
+3. **Create your super admin** with the first block under
+   [Create an account](#create-an-account) (the database makes up the password
+   and shows it to you once). Set the role to `'super'`.
+4. **Create the events**, already open ([Events](#events)).
 5. **Import your students** ([Import](#import)).
 6. **Put them on the event lists** ([Event lists](#event-lists)); a student can
    only check in to an event they are on.
-7. **Check that it worked** with this, which counts what is there:
+7. **Check that it worked.** This counts what is there, in the database you
+   have open:
 
 ```sql
 SELECT (SELECT count(*) FROM staff)         AS accounts,
@@ -39,8 +40,23 @@ SELECT (SELECT count(*) FROM staff)         AS accounts,
        (SELECT count(*) FROM registrations) AS on_lists;
 ```
 
-8. Open the site, sign in as your super admin, and try one scan. Then create
-   the other admins ([Staff accounts](#staff-accounts)).
+And this must come back with **no rows**: it finds accounts that still have
+the demo passwords, which would be a well-known way into the live site.
+
+<!-- demo-accounts -->
+
+```sql
+SELECT username FROM staff
+WHERE password_hash = crypt('boss-demo-pw', password_hash)
+   OR password_hash = crypt('sara-demo-pw', password_hash)
+   OR password_hash = crypt('omar-demo-pw', password_hash);
+```
+
+8. Open the **published** address (the one you share, not the workspace
+   preview), sign in as your super admin and try one scan. The scan is real
+   attendance: press **Undo** on the result (or see
+   [Correcting attendance](#correcting-attendance)). Then create the other
+   admins ([Staff accounts](#staff-accounts)).
 
 Never load `lib/db/sql/seed-demo.sql` into the published database: it holds
 demo accounts with well-known passwords (it refuses to run if real data is
@@ -48,19 +64,27 @@ there, but do not rely on that).
 
 ## Where to run SQL
 
-- **On Replit:** open the **Database** tool, choose the database (the live site
-  uses **Production**; the workspace uses **Development**), and use its **SQL
-  runner**. If the runner only accepts one statement at a time, paste the
-  statements one by one; a `BEGIN` ... `COMMIT` block (see below) then does not
-  protect you, so take a backup first.
-- **From a terminal:** `psql "$DATABASE_URL"`, or run a whole file without psql:
-  `pnpm --filter @workspace/scripts run sql my-changes.sql`. It prints the
-  rows of any `SELECT` and runs the file as a single transaction (if one
-  statement fails, none of it happens). In a Replit workspace terminal
-  `DATABASE_URL` is the **Development** database, not the live one.
+Replit keeps two databases, and what you run only reaches the one you run it in:
 
-Changes show up on scanners within about half a minute, or as soon as a scanner
-is opened or brought back to the front. Nothing needs a restart.
+| You run it in                                                    | It changes                                                                               |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Database** tool → **Production** → SQL runner                  | The live site's data. Setup and day-to-day changes go here.                              |
+| **Database** tool → **Development** → SQL runner                 | The workspace's own copy, which the workspace preview shows. Good for trying things out. |
+| A workspace **terminal** (`psql`, `pnpm ... run sql`, `pg_dump`) | **Development only**: there, `DATABASE_URL` is the Development database.                 |
+
+If the runner only accepts one statement at a time, paste the statements one
+by one; a `BEGIN` ... `COMMIT` block (see below) then does not protect you, so
+copy the tables first (rule 4). The account blocks are written as single
+statements so they run anywhere.
+
+To run a whole file from a terminal without psql (Development or a local
+database): `pnpm --filter @workspace/scripts run sql my-changes.sql`. It prints
+the rows of any `SELECT` and runs the file as a single transaction (if one
+statement fails, none of it happens).
+
+Changes show up on scanners shortly: they re-read the list regularly, and
+whenever the app is opened or brought back to the front. Nothing needs a
+restart.
 
 ## Ground rules
 
@@ -74,8 +98,10 @@ is opened or brought back to the front. Nothing needs a restart.
 2. **Deactivate, don't delete.** Revoke a student (`is_active = false`) and
    deactivate staff instead of deleting them: deleting a student erases their
    attendance, and staff who checked people in cannot be deleted at all.
-3. **Try risky changes inside a transaction** and look before you commit
-   (only where the runner keeps one connection for the whole script):
+3. **Look before you change.** Run a `SELECT` with the same `WHERE` first: it
+   shows exactly the rows the change would touch. Where the runner keeps one
+   connection for the whole script, you can also try a risky change inside a
+   transaction and look before you commit:
 
    ```text
    BEGIN;
@@ -84,19 +110,54 @@ is opened or brought back to the front. Nothing needs a restart.
    COMMIT;       -- or ROLLBACK; to undo it all
    ```
 
-4. **Take a backup before bulk changes**, and keep it **outside the project
-   folder**: it holds names, password hashes and open sessions, and anything in
-   the project can end up committed.
-   `pg_dump "$DATABASE_URL" > ~/backup-$(date +%F).sql`
-   (The same goes for the student CSV below: keep it in your home folder.)
+4. **Copy the tables before bulk changes.** This puts a copy of the student
+   lists next to them, in the same database, so it works in any SQL runner
+   (Production included):
+
+   ```sql
+   CREATE TABLE backup_students      AS SELECT * FROM students;
+   CREATE TABLE backup_registrations AS SELECT * FROM registrations;
+   ```
+
+   If a change deletes rows it should not have, this brings them back (rows
+   still there are left alone):
+
+   ```sql
+   INSERT INTO students      SELECT * FROM backup_students      ON CONFLICT DO NOTHING;
+   INSERT INTO registrations SELECT * FROM backup_registrations ON CONFLICT DO NOTHING;
+   ```
+
+   When you are happy with the result, remove the copies (they hold names):
+
+   ```sql
+   DROP TABLE backup_students, backup_registrations;
+   ```
+
+   A copy in the same database does not protect against losing the database
+   itself. For a **Development or local** database you can also dump it to a
+   file, kept **outside the project folder** (it holds names, password hashes
+   and open sessions, and anything in the project can end up committed):
+   `pg_dump "$DATABASE_URL" > ~/backup-$(date +%F).sql`. That command reaches
+   Development only, so it says nothing about the live site.
 
 ## Events
 
-An event has a short lowercase `id` (letters, digits, `-`, `_`), a name, a
-position in menus and reports (`sort_order`), and an open/closed switch.
-Scanners only offer **open** events.
+An event has a short lowercase `id` (letters, digits, `-`, `_`; at most 64
+characters), a name, a position in menus and reports (`sort_order`), and an
+open/closed switch. Scanners only offer **open** events.
 
-Create an event (closed until you open it). It is safe to run again:
+For a first setup, create the events you need, already open. It is safe to run
+again:
+
+```sql
+INSERT INTO events (id, name, sort_order, is_open) VALUES
+  ('rehearsal',  'Rehearsal',           1, true),
+  ('graduation', 'Graduation ceremony', 2, true),
+  ('trophy',     'Trophy handover',     3, true)
+ON CONFLICT (id) DO NOTHING;
+```
+
+Create one more later (closed until you open it):
 
 ```sql
 INSERT INTO events (id, name, sort_order, is_open)
@@ -104,7 +165,8 @@ VALUES ('dinner', 'Farewell dinner', 4, false)
 ON CONFLICT (id) DO NOTHING;
 ```
 
-Open an event when doors open:
+Open an event when doors open (if the runner says 0 rows changed, there is no
+event with that id):
 
 ```sql
 UPDATE events SET is_open = true WHERE id = 'trophy';
@@ -137,7 +199,8 @@ DELETE FROM events WHERE id = 'workshop';
 
 ### Import
 
-Add students (re-running it updates names, so it is safe to repeat):
+Add students (re-running it updates names, so it is safe to repeat). This works
+in any SQL runner, Production included:
 
 ```sql
 INSERT INTO students (student_id, full_name) VALUES
@@ -147,16 +210,28 @@ INSERT INTO students (student_id, full_name) VALUES
 ON CONFLICT (student_id) DO UPDATE SET full_name = EXCLUDED.full_name;
 ```
 
-From a spreadsheet, save it as CSV (UTF-8) with the columns `student_id` and
-`full_name`, keep the file in your home folder, then use psql's `\copy`:
+**From a spreadsheet**, with the ID in column A and the name in column B, put
+this formula in a third column and copy it down (it doubles any `'` in a name):
+
+`="('"&A2&"', '"&SUBSTITUTE(B2,"'","''")&"'),"`
+
+Paste the resulting lines in place of the three example lines above, then
+**delete the comma at the end of the very last line**. That line ends with the
+closing `)`, with no comma and no `;`, and the `ON CONFLICT` line stays under
+it. It is one statement, so it either imports everyone or no one.
+
+If the statement stops with `students_student_id_check`, the message shows the
+row that broke the rule (`Failing row contains (...)`): fix that ID (see rule 1)
+and run the statement again.
+
+If you have a terminal and a **Development or local** database (in a Replit
+workspace terminal `psql` reaches Development only, so this does not load the
+live site), save the spreadsheet as CSV (UTF-8) with the columns `student_id`
+and `full_name`, keep the file in your home folder, and use psql's `\copy`:
 
 ```bash
 psql "$DATABASE_URL" -c "\copy students (student_id, full_name) FROM '$HOME/students.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
 ```
-
-No psql? Build the `VALUES` lines in the spreadsheet with a formula such as
-`="('"&A2&"', '"&SUBSTITUTE(B2,"'","''")&"'),"` and paste them into the block
-above (the last line ends with `;` instead of `,`).
 
 A new student is on **no** event list yet; see [Event lists](#event-lists).
 
@@ -198,7 +273,20 @@ DELETE FROM students WHERE student_id = '1099';
 A student can only check in to events they are **registered** for. The same
 row is the attendance record, so "expected" and "attended" always agree.
 
-Put every active student on an event:
+Put every active student on **every** event (a first setup where everyone
+attends everything; take the few who should not be there off afterwards, see
+the end of this section). It does nothing until events and students exist:
+
+```sql
+INSERT INTO registrations (student_id, event_id)
+SELECT s.student_id, e.id
+FROM students s
+CROSS JOIN events e
+WHERE s.is_active
+ON CONFLICT DO NOTHING;
+```
+
+Put every active student on one event:
 
 ```sql
 INSERT INTO registrations (student_id, event_id)
@@ -225,8 +313,8 @@ WHERE event_id = 'rehearsal' AND checked_in_at IS NOT NULL
 ON CONFLICT DO NOTHING;
 ```
 
-After importing new students, put the new ones on every event that everyone
-attends, here rehearsal and graduation. Only active students who are on **no**
+After importing new students later, put the new ones on the events everyone
+attends (change the two ids to yours). Only active students who are on **no**
 list yet are added, so anyone you took off an event on purpose stays off:
 
 ```sql
@@ -250,20 +338,41 @@ DELETE FROM registrations WHERE student_id = '1001' AND event_id = 'dinner';
 ## Staff accounts
 
 Usernames are not case-sensitive. Passwords are hashed by Postgres itself
-(`crypt`, always with `gen_salt('bf', 10)` as below), so type the password in
-the statement and it is never stored as written. Type it between the quote
-marks; if it contains a `'`, write it twice (`''`).
+(`crypt`, always with `gen_salt('bf', 10)` as below); the app checks them but
+only ever stores the hash.
 
 ### Create an account
 
-Set the username, the name shown on screen, the role (`'admin'` scans and can
-undo their own check-ins; `'super'` also opens the report and can undo anyone's)
-and **your own password**. The block refuses to run until the password is changed:
+Set the username, the name shown on screen and the role (`'admin'` scans and
+can undo their own check-ins; `'super'` also opens the report). The database
+makes up the password and shows it to you **once**, in the result: read it from
+there and pass it on. It cannot be shown again; reset the password to get a new
+one. It is a single statement, so it works in any SQL runner, and if the
+username is taken it stops with an error and creates nothing.
+
+<!-- create-account -->
+
+```sql
+WITH new AS (SELECT encode(gen_random_bytes(8), 'hex') AS password),
+     created AS (
+       INSERT INTO staff (username, password_hash, display_name, role)
+       SELECT 'dina', crypt(new.password, gen_salt('bf', 10)), 'Dina', 'admin'
+       FROM new
+       RETURNING username
+     )
+SELECT created.username, new.password
+FROM created, new;
+```
+
+**To choose the password yourself instead,** use this block. It refuses to run
+until the example password is replaced. The password is typed into the
+statement, so the SQL runner may keep it in its history: use one you use
+nowhere else. If it contains a `'`, write it twice (`''`).
 
 <!-- placeholder-password -->
 
 ```sql
-DO $$
+DO $acct$
 DECLARE
   the_username text := 'nadia';
   the_name     text := 'Nadia';
@@ -275,17 +384,37 @@ BEGIN
   END IF;
   INSERT INTO staff (username, password_hash, display_name, role)
   VALUES (the_username, crypt(the_password, gen_salt('bf', 10)), the_name, the_role);
-END $$;
+END $acct$;
 ```
 
 ### Change an account
 
-Reset a password (it refuses to run until the password is changed, as above):
+Reset a password: the database makes up a new one and shows it once, as above.
+If the result has **no rows**, there is no account with that username and
+nothing was changed:
+
+<!-- reset-password -->
+
+```sql
+WITH new AS (SELECT encode(gen_random_bytes(8), 'hex') AS password),
+     changed AS (
+       UPDATE staff
+       SET password_hash = crypt(new.password, gen_salt('bf', 10))
+       FROM new
+       WHERE lower(staff.username) = 'dina'
+       RETURNING staff.username
+     )
+SELECT changed.username, new.password
+FROM changed, new;
+```
+
+To choose the new password yourself (it refuses to run until the password is
+changed, as above, and reports an unknown username):
 
 <!-- placeholder-password -->
 
 ```sql
-DO $$
+DO $acct$
 DECLARE
   the_username text := 'nadia';
   the_password text := 'type-your-own-password';  -- REPLACE this with the new password
@@ -296,7 +425,10 @@ BEGIN
   UPDATE staff
   SET password_hash = crypt(the_password, gen_salt('bf', 10))
   WHERE lower(username) = lower(the_username);
-END $$;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'There is no account called %.', the_username;
+  END IF;
+END $acct$;
 ```
 
 Change a display name or role (takes effect on their next request):

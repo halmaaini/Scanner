@@ -51,7 +51,7 @@ Work top to bottom and stop where the change no longer reaches.
 ## Conventions
 
 - TypeScript, strict; `pnpm run typecheck` at the root builds the shared libs first (a package's own `typecheck` will complain until they are built).
-- Generated code (`lib/api-zod`, `lib/api-client-react`, `lib/db/migrations`) is committed and never hand-edited. Prettier ignores it.
+- Generated code (`lib/api-zod`, `lib/api-client-react/src/generated`, `lib/db/migrations`) is committed and never hand-edited. Prettier ignores it. (`lib/api-client-react/src/custom-fetch.ts` is hand-written.)
 - Format with `pnpm format`. Comments explain _why_, not what; no dead code, no half-finished features.
 - Tests live next to the code (`*.test.ts`). The database and API tests are **skipped, with a warning**, unless `TEST_DATABASE_URL` is set (so say in a handoff whether they ran); they wipe that database, and refuse any whose name does not contain `test`.
 - The scanner must keep working with no connection: a change to scanning or the roster needs an offline test in `e2e/tests/offline.spec.ts` or a unit test in `web/src/offline`.
@@ -62,5 +62,5 @@ Work top to bottom and stop where the change no longer reaches.
 - Sessions live in the `sessions` table, created by a migration (`connect-pg-simple`'s own table creation does not work on Replit).
 - Hosted Postgres drops idle connections; `lib/db/src/client.ts` handles the pool's `error` event so a drop cannot crash the server.
 - The service worker (`sw.js`) must be served as JavaScript at the site root, not rewritten to `index.html`; `/api` is never cached by it.
-- Replit copies the development database's structure to Production when publishing, before the API's first start there. `runMigrations` copes (it records the migrations as applied when the schema is already complete); keep migrations structure-only so that stays true.
+- Replit copies the development database's structure to Production when publishing, before the API's first start there. `runMigrations` copes (it skips a step that fails only because its result already exists, runs the rest, and keeps nothing unless the schema then matches the latest migration); keep migrations structure-only and additive so that stays true (a step that only removes something the copy already removed is not covered).
 - Behind Replit's proxy the API trusts `TRUST_PROXY_HOPS` proxies (default 1) for the client address and the HTTPS flag; check it after the first publish.

@@ -28,7 +28,7 @@ test.describe("a slow or failing server", () => {
 
     await scanById(page, "1007");
 
-    await expect(page.getByText("Checking…")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Checking…" })).toBeVisible();
     // Read-only, not gone: a second ID cannot be typed in over the first.
     await expect(page.getByLabel("Student ID")).toHaveAttribute("readonly", "");
     await expect(
@@ -58,6 +58,32 @@ test.describe("a slow or failing server", () => {
     ).toBeVisible({ timeout: 2_000 });
     await result.getByRole("button", { name: "Scan next" }).click();
     await expect(countLine(page)).toHaveText("7 of 9 checked in");
+  });
+
+  test("keeps saying offline while the server is out of reach, even after a scan that needs no sending", async ({
+    page,
+  }) => {
+    // The browser believes it is online, but nothing gets through: Wi-Fi with
+    // no internet. (Playwright's "offline" switch would also flip the
+    // browser's own flag, which hides exactly this case.)
+    await page.route("**/api/**", (route) => route.abort());
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event("visibilitychange")),
+    );
+    await expect(page.getByText("Offline", { exact: true })).toBeVisible();
+
+    // 1001 is already checked in: the phone says so from its saved list, and
+    // there is nothing to send.
+    await scanById(page, "1001");
+    const result = page.getByRole("dialog");
+    await expect(
+      result.getByRole("heading", { name: "Already checked in" }),
+    ).toBeVisible();
+    await result.getByRole("button", { name: "Scan next" }).click();
+
+    // Having nothing to send proved nothing: it does not say it is back.
+    await expect(page.getByText("Offline", { exact: true })).toBeVisible();
+    await expect(allSaved(page)).toBeVisible();
   });
 
   test("sends you to sign in again when the session ends while online, keeping the scan", async ({

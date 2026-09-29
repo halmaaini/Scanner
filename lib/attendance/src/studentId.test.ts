@@ -61,6 +61,36 @@ describe("normalizeStudentId", () => {
     expect(normalizeStudentId(noisy)).toBe("202104517");
   });
 
+  it("drops control characters, including NUL", () => {
+    expect(
+      normalizeStudentId(`20${char(0)}21${char(0x1f)}04${char(0x7f)}5`),
+    ).toBe("2021045");
+    expect(normalizeStudentId(`2021${char(0x0085)}${char(0x009f)}`)).toBe(
+      "2021",
+    );
+  });
+
+  it("drops variation selectors and the other invisible fillers", () => {
+    const noisy = `2021${char(0xfe0f)}04${char(0x034f)}${char(0x3164)}517`;
+    expect(normalizeStudentId(noisy)).toBe("202104517");
+  });
+
+  // The list of dropped characters is written out (the browser, the server and
+  // the database must all use the same one), so this is what notices a
+  // character the Unicode standard has since made invisible.
+  it("drops every control character, space and invisible mark of the Basic Multilingual Plane", () => {
+    const invisible = /[\p{Cc}\p{Z}\p{Default_Ignorable_Code_Point}]/u;
+    const kept: string[] = [];
+    for (let code = 0; code <= 0xffff; code++) {
+      if (code >= 0xd800 && code <= 0xdfff) continue;
+      const c = char(code);
+      if (invisible.test(c) && normalizeStudentId(`A${c}1`) !== "A1") {
+        kept.push(`U+${code.toString(16).padStart(4, "0")}`);
+      }
+    }
+    expect(kept).toEqual([]);
+  });
+
   it("returns an empty string for blank input", () => {
     expect(normalizeStudentId("   \t")).toBe("");
   });

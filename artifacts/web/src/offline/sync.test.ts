@@ -549,5 +549,173 @@ describe("sync engine", () => {
       await sending;
       expect(outbox.getState().ops).toEqual([]);
     });
+
+    it("does not send a change that was taken back while an earlier request was on the wire", async () => {
+      const sent: string[] = [];
+      const gate = deferred();
+      let first = true;
+      const { outbox, engine, api } = createTestSync({
+        submitScans: async (scans: Scan[]) => {
+          sent.push(`scans:${scans.map((s) => s.studentId).join(",")}`);
+          if (first) {
+            first = false;
+            await gate.promise;
+          }
+          return scans.map((s) => recorded(s));
+        },
+        undoCheckIn: async (eventId, studentId) => {
+          sent.push(`undo:${studentId}`);
+          return cleared(studentId, eventId);
+        },
+      });
+      const scan = scanOp("1003");
+      [scanOp("1001"), undoOp("1002"), scan].forEach((op) => outbox.add(op));
+      const sending = engine.flush(2);
+      await vi.waitFor(() => expect(api.submitScans).toHaveBeenCalledTimes(1));
+
+      // The pass has already read the queue, but this one has not gone out.
+      expect(engine.cancel(scan.id)).toBe(true);
+      gate.resolve();
+      await sending;
+
+      expect(sent).toEqual(["scans:1001", "undo:1002"]);
+      expect(outbox.getState().ops).toEqual([]);
+    });
+
+    it("cannot take back a change whose request timed out: the server may have it", async () => {
+      const { outbox, engine } = createTestSync({
+        submitScans: async () => {
+          throw new DOMException("Request timed out", "TimeoutError");
+        },
+      });
+      const scan = scanOp("1001");
+      outbox.add(scan);
+      await engine.flush(2);
+
+      expect(engine.cancel(scan.id)).toBe(false);
+      expect(outbox.getState().ops).toEqual([scan]);
+    });
+
+    it("can take back a change whose request never got to the server", async () => {
+      const { outbox, engine } = createTestSync({
+        submitScans: async () => {
+          throw networkError();
+        },
+      });
+      const scan = scanOp("1001");
+      outbox.add(scan);
+      await engine.flush(2);
+
+      expect(engine.cancel(scan.id)).toBe(true);
+      expect(outbox.getState().ops).toEqual([]);
+    });
+
+    it("still cannot take a change back once an earlier request may have carried it", async () => {
+      let call = 0;
+      const { outbox, engine } = createTestSync({
+        submitScans: async () => {
+          call += 1;
+          if (call === 1) {
+            throw new DOMException("Request timed out", "TimeoutError");
+          }
+          throw networkError();
+        },
+      });
+      const scan = scanOp("1001");
+      outbox.add(scan);
+      await engine.flush(2);
+      await engine.flush(2);
+
+      expect(engine.cancel(scan.id)).toBe(false);
+    });
+  });
+
+  describe("what it says about the server", () => {
+    it("says nothing when everything was taken back before anything was sent", async () => {
+      // A pass that finds an empty queue has not proved the server is there.
+      const turn = deferred();
+      const { outbox, engine, api, hooks } = createTestSync(
+        {},
+        {
+          exclusive: async (run) => {
+            await turn.promise;
+            await run();
+          },
+        },
+      );
+      const scan = scanOp("1001");
+      outbox.add(scan);
+      const sending = engine.flush(2);
+      await vi.waitFor(() => expect(engine.getStatus().syncing).toBe(true));
+
+      expect(engine.cancel(scan.id)).toBe(true);
+      turn.resolve();
+      await sending;
+
+      expect(api.submitScans).not.toHaveBeenCalled();
+      expect(hooks.onReachable).not.toHaveBeenCalled();
+    });
+
+    it("counts a refusal as an answer: the server is there", async () => {
+      const { outbox, engine, hooks } = createTestSync({
+        submitScans: async () => {
+          throw httpError(400);
+        },
+      });
+      outbox.add(scanOp("1001"));
+      await engine.flush(2);
+      expect(hooks.onReachable).toHaveBeenLastCalledWith(true);
+    });
+
+    it("leaves a background send alone when the person will not wait for it anyway", async () => {
+      const gate = deferred<ScanResult[]>();
+      let call = 0;
+      let firstSignal: AbortSignal | undefined;
+      let reachable = true;
+      const { outbox, engine, api } = createTestSync(
+        {
+          submitScans: async (scans: Scan[], signal: AbortSignal) => {
+            call += 1;
+            if (call === 1) {
+              firstSignal = signal;
+              return gate.promise;
+            }
+            return scans.map((s) => recorded(s));
+          },
+        },
+        { isReachable: () => reachable },
+      );
+      const backlog = scanOp("1001");
+      outbox.add(backlog);
+      const background = engine.flush(2);
+      await vi.waitFor(() => expect(api.submitScans).toHaveBeenCalledTimes(1));
+
+      reachable = false;
+      const scan = scanOp("1002");
+      outbox.add(scan);
+      expect(await engine.send(scan)).toBeUndefined();
+
+      expect(firstSignal?.aborted).toBe(false);
+      gate.resolve([recorded(backlog)]);
+      await background;
+      expect(outbox.getState().ops).toEqual([]);
+    });
+
+    it("tells the API whether a person is waiting, so it can pick the time limit", async () => {
+      const waiting: boolean[] = [];
+      const { outbox, engine } = createTestSync({
+        submitScans: async (scans: Scan[], _signal, interactive) => {
+          waiting.push(interactive);
+          return scans.map((s) => recorded(s));
+        },
+      });
+      outbox.add(scanOp("1001"));
+      await engine.flush(2);
+      const scan = scanOp("1002");
+      outbox.add(scan);
+      await engine.send(scan);
+
+      expect(waiting).toEqual([false, true]);
+    });
   });
 });

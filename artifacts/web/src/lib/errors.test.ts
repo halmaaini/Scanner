@@ -1,6 +1,11 @@
 import { ApiError, ResponseParseError } from "@workspace/api-client-react";
 import { describe, expect, it } from "vitest";
-import { isNetworkError, isUnauthorized, statusOf } from "./errors";
+import {
+  failedToConnect,
+  isNetworkError,
+  isUnauthorized,
+  statusOf,
+} from "./errors";
 
 const response = (status: number) => new Response(null, { status });
 const request = { method: "GET", url: "/api/x" };
@@ -53,5 +58,29 @@ describe("isNetworkError", () => {
     for (const status of [400, 401, 403, 404, 429, 500]) {
       expect(isNetworkError(apiError(status))).toBe(false);
     }
+  });
+});
+
+describe("failedToConnect", () => {
+  it("is true when fetch itself failed, so the request never got there", () => {
+    expect(failedToConnect(new TypeError("Failed to fetch"))).toBe(true);
+  });
+
+  it("is false when the server may have acted on the request", () => {
+    expect(failedToConnect(new DOMException("timed out", "TimeoutError"))).toBe(
+      false,
+    );
+    expect(
+      failedToConnect(
+        new ResponseParseError(
+          response(200),
+          "<html>",
+          new Error("x"),
+          request,
+        ),
+      ),
+    ).toBe(false);
+    expect(failedToConnect(apiError(502))).toBe(false);
+    expect(failedToConnect(apiError(500))).toBe(false);
   });
 });

@@ -11,24 +11,33 @@ type CodePointRange = readonly [first: number, last: number];
 
 /**
  * Characters that never belong in an ID and are dropped when one is typed,
- * scanned or pasted: whitespace, and the invisible marks (zero-width and
- * direction marks, soft hyphen) that come along when an ID is copied from
- * Arabic text or a spreadsheet.
+ * scanned or pasted: control characters, whitespace, and the invisible marks
+ * (zero-width and direction marks, soft hyphen, variation selectors) that come
+ * along when an ID is copied from Arabic text or a spreadsheet. This is every
+ * such character of the Basic Multilingual Plane (a test checks it against the
+ * Unicode properties); the rare invisible ones outside it are not covered.
  */
 const IGNORED: readonly CodePointRange[] = [
-  [0x0009, 0x000d], // tab, line feed, vertical tab, form feed, carriage return
+  [0x0000, 0x001f], // control characters: NUL, tab, line feed, carriage return, ...
   [0x0020, 0x0020], // space
-  [0x0085, 0x0085], // next line
+  [0x007f, 0x009f], // delete and the C1 controls (next line among them)
   [0x00a0, 0x00a0], // no-break space
   [0x00ad, 0x00ad], // soft hyphen
+  [0x034f, 0x034f], // combining grapheme joiner
   [0x061c, 0x061c], // Arabic letter mark
+  [0x115f, 0x1160], // Hangul choseong and jungseong fillers
   [0x1680, 0x1680], // Ogham space mark
-  [0x180e, 0x180e], // Mongolian vowel separator
+  [0x17b4, 0x17b5], // Khmer inherent vowels
+  [0x180b, 0x180f], // Mongolian variation selectors and vowel separator
   [0x2000, 0x200f], // en/em/thin/... spaces, zero-width space and joiners, left/right marks
   [0x2028, 0x202f], // line and paragraph separators, direction embeddings/overrides, narrow no-break space
   [0x205f, 0x206f], // medium mathematical space, word joiner, invisible operators, direction isolates
   [0x3000, 0x3000], // ideographic space
+  [0x3164, 0x3164], // Hangul filler
+  [0xfe00, 0xfe0f], // variation selectors
   [0xfeff, 0xfeff], // zero-width no-break space (byte-order mark)
+  [0xffa0, 0xffa0], // halfwidth Hangul filler
+  [0xfff0, 0xfff8], // unassigned, but ignorable by default
 ];
 
 /**
@@ -84,8 +93,9 @@ const digitValues = new Map<string, string>(
  *
  * - Arabic-Indic and Persian digits become 0-9.
  * - Full-width and other compatibility forms are folded (NFKC).
- * - Whitespace and invisible direction marks are removed: IDs never contain
- *   them, but they sneak in when an ID is pasted or copied from Arabic text.
+ * - Control characters, whitespace and invisible marks are removed: IDs never
+ *   contain them, but they sneak in when an ID is pasted or copied from Arabic
+ *   text (and a stray NUL in a QR code would be refused by the database).
  *
  * Letters, case and punctuation are left alone. The result is a fixed point
  * (normalizing it again changes nothing); the database only stores IDs that

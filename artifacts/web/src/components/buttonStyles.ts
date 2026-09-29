@@ -13,8 +13,8 @@ const base =
 export const buttonStyles = {
   primary: `${base} bg-ink text-white hover:bg-ink-hover`,
   outline: `${base} border-2 border-ink text-ink hover:bg-ink/5`,
-  /** White button on a coloured result screen; the caller adds the text colour. */
-  onTone: `${base} h-[60px] w-full rounded-[14px] bg-white text-lg`,
+  /** Paper-coloured button on a coloured result screen; the caller adds the text colour. */
+  onTone: `${base} h-[60px] w-full rounded-[14px] bg-surface text-lg`,
   link: "inline-flex min-h-11 items-center text-[15px] font-semibold text-ink underline-offset-4 hover:underline",
   linkOnDark:
     "inline-flex min-h-12 items-center justify-center text-base font-semibold text-white underline-offset-4 hover:underline",

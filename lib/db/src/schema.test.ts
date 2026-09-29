@@ -1,7 +1,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { normalizeStudentId } from "@workspace/attendance";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { selectTestDatabase } from "./test-database";
 
 // Needs a scratch Postgres: TEST_DATABASE_URL=postgres://... pnpm --filter @workspace/db test
@@ -231,13 +239,24 @@ describe.skipIf(!testUrl)("database schema (needs TEST_DATABASE_URL)", () => {
     );
   });
 
-  it("refuses to run destructive helpers against a non-test database", async () => {
-    const original = process.env.TEST_DATABASE_URL;
-    process.env.TEST_DATABASE_URL = "postgres://elsewhere/db";
+  // The helpers ask the connection itself which database it is on, so no
+  // setting or import order can point a wipe at a real one.
+  it("refuses to run destructive helpers on a connection to a non-test database", async () => {
+    const query = vi
+      .spyOn(pool, "query")
+      .mockResolvedValue({ rows: [{ name: "heliumdb" }] } as never);
     try {
-      await expect(clearData()).rejects.toThrow(/Refusing/);
+      await expect(clearData()).rejects.toThrow(
+        /Refusing to use the database "heliumdb"/,
+      );
+      await expect(resetDatabase(migrationsFolder)).rejects.toThrow(/Refusing/);
+      // Nothing but the question was asked: no truncate, no drop.
+      expect(query).toHaveBeenCalledTimes(2);
+      for (const [text] of query.mock.calls) {
+        expect(String(text)).toContain("current_database()");
+      }
     } finally {
-      process.env.TEST_DATABASE_URL = original;
+      query.mockRestore();
     }
   });
 });

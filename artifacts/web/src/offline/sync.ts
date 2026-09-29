@@ -5,16 +5,29 @@ import type {
 } from "@workspace/api-client-react";
 import { isRecorded, MAX_SCANS_PER_REQUEST } from "@workspace/attendance";
 import type { PendingOp, ScanOp } from "@/domain/ops";
-import { isNetworkError, isUnauthorized, statusOf } from "@/lib/errors";
+import {
+  failedToConnect,
+  isNetworkError,
+  isUnauthorized,
+  statusOf,
+} from "@/lib/errors";
 import type { IssueReason, Outbox, SyncIssue } from "./outbox";
 
-/** The two calls the engine makes. Real ones add a timeout (see index.ts). */
+/**
+ * The two calls the engine makes. Real ones add a timeout (see index.ts):
+ * `interactive` says a person is waiting on the answer, so it should be short.
+ */
 export interface SyncApi {
-  submitScans(scans: Scan[], signal: AbortSignal): Promise<ScanResult[]>;
+  submitScans(
+    scans: Scan[],
+    signal: AbortSignal,
+    interactive: boolean,
+  ): Promise<ScanResult[]>;
   undoCheckIn(
     eventId: string,
     studentId: string,
     signal: AbortSignal,
+    interactive: boolean,
   ): Promise<Registration>;
 }
 
@@ -65,8 +78,9 @@ export interface SyncEngine {
    */
   send(op: PendingOp): Promise<OpAnswer | undefined>;
   /**
-   * Takes a change back off the queue, if it has not gone (or started going)
-   * to the server. Returns whether it did; if not, the change stands.
+   * Takes a change back off the queue, if the server cannot have it: no
+   * request has carried it, or the only ones that did met no connection.
+   * Returns whether it did; if not, the change stands.
    */
   cancel(opId: string): boolean;
   getStatus(): SyncStatus;
@@ -113,8 +127,12 @@ export function createSyncEngine({
   const waiters = new Map<string, (answer: OpAnswer | undefined) => void>();
   /** Staff whose queues the next pass should send. */
   const wanted = new Set<number>();
-  /** Changes in the request being sent right now. */
-  const inFlight = new Set<string>();
+  /**
+   * Changes a request has carried, on the wire now or gone and unanswered
+   * (timed out, dropped): the server may have them. Not those that only met
+   * a missing connection.
+   */
+  const attempted = new Set<string>();
   let flight:
     | { controller: AbortController; interactive: boolean; superseded: boolean }
     | undefined;
@@ -143,7 +161,7 @@ export function createSyncEngine({
   /** One request, which a person's scan may call off if it is only background work. */
   async function request<T>(
     ops: readonly PendingOp[],
-    call: (signal: AbortSignal) => Promise<T>,
+    call: (signal: AbortSignal, interactive: boolean) => Promise<T>,
   ): Promise<T> {
     const current = {
       controller: new AbortController(),
@@ -151,65 +169,83 @@ export function createSyncEngine({
       superseded: false,
     };
     flight = current;
-    ops.forEach((op) => inFlight.add(op.id));
+    // From here on the server may act on them, so they cannot be taken back...
+    const notAttemptedBefore = ops.filter((op) => !attempted.has(op.id));
+    ops.forEach((op) => attempted.add(op.id));
     try {
-      return await call(current.controller.signal);
+      return await call(current.controller.signal, current.interactive);
     } catch (error) {
+      // ...unless the request never got anywhere.
+      if (failedToConnect(error)) {
+        notAttemptedBefore.forEach((op) => attempted.delete(op.id));
+      }
       throw current.superseded ? SUPERSEDED : error;
     } finally {
       flight = undefined;
-      ops.forEach((op) => inFlight.delete(op.id));
     }
   }
 
   /** Sends what `staffId` has waiting. Stops at the first thing it cannot send. */
   async function sendAll(staffId: number): Promise<void> {
     outbox.refresh();
-    const waiting = outbox
-      .getState()
-      .ops.filter((op) => op.staffId === staffId);
     let stale = false;
+    // Whether the server answered at all (even with a refusal).
+    let reached = false;
     // After the server cannot read a request, scans go one per request so the
     // one it cannot read does not take the others down with it.
     let oneAtATime = false;
+    // Changes this pass is done with, answered or not: it moves on past them.
+    const handled = new Set<string>();
+
+    /**
+     * What is waiting, read fresh before every request: a change taken back
+     * while an earlier request was on the wire must not be sent after all.
+     */
+    const waitingNow = () =>
+      outbox
+        .getState()
+        .ops.filter((op) => op.staffId === staffId && !handled.has(op.id));
 
     /** Files a failure for later, unless someone is waiting and is told directly. */
     const fail = (op: PendingOp, reason: IssueReason): SyncIssue[] =>
       waiters.has(op.id) ? [] : [{ op, reason, at: now().toISOString() }];
 
     try {
-      let i = 0;
-      while (i < waiting.length) {
-        const op = waiting[i]!;
+      for (
+        let waiting = waitingNow();
+        waiting.length > 0;
+        waiting = waitingNow()
+      ) {
+        const op = waiting[0]!;
 
         if (op.type === "scan") {
           const batch: ScanOp[] = [];
           const limit = oneAtATime ? 1 : MAX_SCANS_PER_REQUEST;
-          while (
-            i + batch.length < waiting.length &&
-            batch.length < limit &&
-            waiting[i + batch.length]!.type === "scan"
-          ) {
-            batch.push(waiting[i + batch.length] as ScanOp);
+          for (const next of waiting) {
+            if (next.type !== "scan" || batch.length === limit) break;
+            batch.push(next);
           }
 
           let results: ScanResult[];
           try {
-            results = await request(batch, (signal) =>
-              api.submitScans(batch.map(toWire), signal),
+            results = await request(batch, (signal, interactive) =>
+              api.submitScans(batch.map(toWire), signal, interactive),
             );
           } catch (error) {
             if (statusOf(error) !== 400) throw error;
+            reached = true;
             if (batch.length > 1) {
               oneAtATime = true;
               continue;
             }
             // One scan the server cannot read and never will: do not retry it forever.
+            handled.add(op.id);
             outbox.settle([op.id], fail(op, "invalid"));
             answer(op.id, { kind: "rejected", reason: "invalid" });
-            i += 1;
             continue;
           }
+          reached = true;
+          batch.forEach((scan) => handled.add(scan.id));
 
           const byId = new Map(results.map((r) => [r.id, r]));
           const answered: ScanResult[] = [];
@@ -236,12 +272,13 @@ export function createSyncEngine({
           answered.forEach((result) =>
             answer(result.id, { kind: "scan", result }),
           );
-          i += batch.length;
         } else {
+          handled.add(op.id);
           try {
-            const registration = await request([op], (signal) =>
-              api.undoCheckIn(op.eventId, op.studentId, signal),
+            const registration = await request([op], (signal, interactive) =>
+              api.undoCheckIn(op.eventId, op.studentId, signal, interactive),
             );
+            reached = true;
             await hooks.onRegistrations([registration]);
             outbox.settle([op.id]);
             answer(op.id, { kind: "undo", registration });
@@ -249,20 +286,25 @@ export function createSyncEngine({
             const code = statusOf(error);
             if (code === 404) {
               // No such registration: there is nothing left to undo.
+              reached = true;
               outbox.settle([op.id]);
               answer(op.id, { kind: "undo", registration: null });
             } else if (code === 403) {
+              reached = true;
               outbox.settle([op.id], fail(op, "undo_forbidden"));
               answer(op.id, { kind: "rejected", reason: "undo_forbidden" });
             } else {
               throw error;
             }
           }
-          i += 1;
         }
       }
-      hooks.onReachable(true);
-      setStatus({ serverProblem: false });
+      // Only a real answer says the server is there: a pass that found nothing
+      // left to send (everything was taken back meanwhile) proves nothing.
+      if (reached) {
+        hooks.onReachable(true);
+        setStatus({ serverProblem: false });
+      }
     } catch (error) {
       // Stop here; everything not yet answered stays queued for the next attempt.
       if (error === SUPERSEDED) return;
@@ -290,6 +332,9 @@ export function createSyncEngine({
     } finally {
       // Whatever was not answered for whatever reason ends the wait.
       snapshot.forEach((op) => answer(op.id, undefined));
+      // Changes that have left the queue no longer need remembering.
+      const queued = new Set(outbox.getState().ops.map((op) => op.id));
+      attempted.forEach((id) => queued.has(id) || attempted.delete(id));
       setStatus({ syncing: false });
     }
   }
@@ -326,6 +371,13 @@ export function createSyncEngine({
         waiters.set(op.id, resolve),
       );
       wanted.add(op.staffId);
+      if (!isReachable()) {
+        // Nobody waits for the network now, so a send already trying to get
+        // through is left alone; the change stays queued for it.
+        void start();
+        answer(op.id, undefined);
+        return answered;
+      }
       // Background work that is still on the wire only delays this: call it
       // off, its changes stay queued and go out again in the next pass.
       if (flight && !flight.interactive) {
@@ -333,12 +385,11 @@ export function createSyncEngine({
         flight.controller.abort();
       }
       void start();
-      if (!isReachable()) answer(op.id, undefined);
       return answered;
     },
     cancel(opId) {
       const queued = outbox.getState().ops.some((op) => op.id === opId);
-      if (!queued || inFlight.has(opId)) return false;
+      if (!queued || attempted.has(opId)) return false;
       outbox.settle([opId]);
       answer(opId, undefined);
       return true;

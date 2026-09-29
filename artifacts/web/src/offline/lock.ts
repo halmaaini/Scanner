@@ -1,5 +1,4 @@
-/** One name for "some tab is sending the saved changes". */
-const SYNC_LOCK = "scanner.sync";
+import { SYNC_LOCK_NAME } from "@/config";
 
 /**
  * Runs a sending pass only if no other tab or window of the app is sending
@@ -15,7 +14,7 @@ export async function exclusiveAcrossTabs(
     return run();
   }
   await navigator.locks.request(
-    SYNC_LOCK,
+    SYNC_LOCK_NAME,
     { ifAvailable: true },
     async (lock) => {
       if (lock) await run();
