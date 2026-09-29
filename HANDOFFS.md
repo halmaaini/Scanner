@@ -2,9 +2,9 @@
 
 Status of every round, oldest first. Detail in `Claude Handoffs/NNN-slug.md` (build + steps) and `Replit Handoffs/NNN-slug.md` (run + result).
 
-| #   | Round         | Status     | Commit |
-| --- | ------------- | ---------- | ------ |
-| 001 | initial build | ⬜ planned |        |
+| #   | Round         | Status                  | Commit |
+| --- | ------------- | ----------------------- | ------ |
+| 001 | initial build | 🚧 in progress (Claude) |        |
 
 **Status lifecycle:**
 `⬜ planned` → `🚧 in progress (Claude)` → `📤 pending Replit` → `✅ done & deployed`

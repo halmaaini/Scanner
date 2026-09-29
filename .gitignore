@@ -7,6 +7,13 @@ out-tsc
 # dependencies
 node_modules
 
+# real data the owner works with (never commit names, IDs or password hashes)
+backup-*.sql
+*.dump
+students*.csv
+my-changes.sql
+attendance-*.csv
+
 # environment (never commit secrets)
 .env
 .env.*

@@ -14,7 +14,10 @@ general enough to reuse.
 
 ## Try it locally
 
-You need Node 22+, pnpm, and PostgreSQL 16.
+You need Node 22+ (Replit runs 24), pnpm 10.16+, and PostgreSQL 16. The
+workspace settings skip the native binaries of every platform except Linux x64
+(what Replit runs); to develop on macOS, Windows or ARM, remove the
+`esbuild>@esbuild/...` lines from `pnpm-workspace.yaml`.
 
 ```bash
 pnpm install
@@ -26,7 +29,7 @@ pnpm --filter @workspace/api-server run dev
 # load demo data once (development databases only!)
 pnpm --filter @workspace/scripts run sql lib/db/sql/seed-demo.sql
 
-# terminal 2: the web app (proxies /api to port 8080)
+# terminal 2: the web app (proxies /api to the API: port 8080, or API_PROXY_TARGET)
 PORT=5173 pnpm --filter @workspace/web run dev
 ```
 
@@ -38,13 +41,18 @@ The camera needs HTTPS or `localhost`; without a camera, type the ID instead.
 
 ```bash
 pnpm run typecheck        # types for every package (also builds the shared libs)
-pnpm test                 # unit tests; database and API tests run when TEST_DATABASE_URL is set
+pnpm test                 # unit tests, plus database and API tests if TEST_DATABASE_URL is set
 pnpm --filter @workspace/e2e test:e2e   # real browser, real API, real database
+pnpm run check:generated  # fails if the generated API code is out of date with the spec
 ```
 
-`TEST_DATABASE_URL` must be a scratch Postgres database: the tests **wipe** it,
-and refuse to touch anything else. The browser tests also need Chromium
-(`CHROMIUM_PATH=/path/to/chrome` if Playwright has not downloaded one).
+`TEST_DATABASE_URL` must be a scratch Postgres database whose name contains
+`test` (say `scanner_test`): the tests **wipe** it, and refuse to touch
+anything else. **Without it the database and API tests are skipped, not
+passed** (a warning says so), so a green `pnpm test` on its own does not mean
+they ran. The browser tests also need Chromium: run
+`pnpm --filter @workspace/e2e exec playwright install chromium`, or set
+`CHROMIUM_PATH=/path/to/chrome` to use one you have.
 
 ## How it is organised
 
@@ -68,18 +76,19 @@ docs                   The admin SQL cookbook.
 Each fact is defined in exactly one place; everything else is generated from it
 or reads it. To change a fact, change it there.
 
-| What                  | Defined in                                             | Used by                                                       |
-| --------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| Database shape        | `lib/db/src/schema` (migrations are generated from it) | all server queries; the SQL cookbook is tested against it     |
-| API contract          | `lib/api-spec/openapi.yaml`                            | server validation and web client, both generated              |
-| Who can be admitted   | `lib/attendance` `evaluateScan`                        | the server, and the scanner's offline mode                    |
-| Student ID cleaning   | `lib/attendance` `normalizeStudentId`                  | server and web                                                |
-| Roles and permissions | `lib/attendance` `can` / `canUndoCheckIn`              | server checks and web menus                                   |
-| What the app knows    | `GET /api/roster`                                      | scanner, report, counts, CSV and the offline copy all read it |
-| Counting attendance   | `web/src/domain/summary.ts`                            | scanner header and report                                     |
-| Every write           | the outbox (`web/src/offline`)                         | scans and undos take the same path                            |
-| All wording           | `web/src/messages.ts`                                  | every screen                                                  |
-| Colours and fonts     | `web/src/index.css`                                    | every screen                                                  |
+| What                     | Defined in                                             | Used by                                                                      |
+| ------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Database shape           | `lib/db/src/schema` (migrations are generated from it) | all server queries; the SQL cookbook is tested against it                    |
+| API contract             | `lib/api-spec/openapi.yaml`                            | server validation and web client, both generated                             |
+| Who can be admitted      | `lib/attendance` `evaluateScan` / `isRecorded`         | the server, and the scanner's offline mode                                   |
+| Student ID cleaning      | `lib/attendance` `normalizeStudentId`                  | server and web; the database's ID check is built from the same rule          |
+| Roles and permissions    | the spec's `StaffRole`, then `lib/attendance`          | server checks and web menus; the database's copy is checked by a test        |
+| What the app knows       | `GET /api/roster`                                      | scanner, report, counts, CSV and the offline copy all read it                |
+| Counting attendance      | `web/src/domain/summary.ts`                            | scanner header and report                                                    |
+| Every write              | the outbox (`web/src/offline`)                         | scans and undos take the same path                                           |
+| All wording              | `web/src/messages.ts`                                  | every screen                                                                 |
+| Colours and fonts        | `web/src/index.css`                                    | every screen; the app manifest and icons read it through `scripts/theme.mjs` |
+| Timings, limits, storage | `web/src/config.ts`                                    | the web app and the browser tests                                            |
 
 New screens and reports should be a new _view of the roster_ (a function in
 `web/src/domain`), not a new endpoint. See [`CLAUDE.md`](CLAUDE.md) for the
@@ -87,17 +96,34 @@ checklist to follow when changing something.
 
 ### How scanning works
 
-1. A scan is written to a queue on the phone (the _outbox_), then sent.
+1. A scan is written to a queue on the phone (the _outbox_), then sent. The
+   person waits at most a few seconds: "Checking…" is shown meanwhile.
 2. If the server answers, that answer is shown: green to admit, amber for a
    repeat, red to refuse. It is the truth.
-3. If the server cannot be reached, the phone judges the scan itself from its
-   saved copy of the roster, using the same rules, marks the answer "offline",
-   and keeps the scan queued. It is sent, in order, when the connection returns.
+3. If the server cannot be reached (or is already known to be out of reach), the
+   phone judges the scan itself from its saved copy of the roster, using the
+   same rules, marks the answer "offline", and keeps the scan queued. It is
+   sent, in order, when the connection returns.
 4. Anything the server later refuses (say, a student revoked in the meantime) is
    listed on the scanner until dismissed. Nothing is dropped silently.
 
-Undo goes through the same queue, so it is applied after the scan it corrects
-even if that scan has not reached the server yet.
+Undo goes through the same queue, so it is applied after the scan it corrects.
+If that scan is still only on the phone, it is simply taken back instead. Only
+one tab or window of the app sends the queue at a time.
+
+## Deploying on Replit
+
+See [`replit.md`](replit.md). In short: two artifacts (web at `/`, API at
+`/api`), a Postgres database, and one secret, `SESSION_SECRET`. Database
+migrations apply themselves when the API starts (Replit also copies the
+development database's tables to production when you publish; the API
+recognises that and does not fail on it).
+
+Replit keeps **two databases**: Development (the workspace's) and Production
+(what the published site reads). No accounts exist at first. After the first
+publish, the owner creates the super admin and loads the data **in Production**
+with SQL: follow "First-time setup" in
+[`docs/admin-sql.md`](docs/admin-sql.md).
 
 ## Deploying on Replit
 
@@ -111,4 +137,14 @@ create the super admin with SQL (see the cookbook).
 The student page is open to anyone who knows an ID (a deliberate, accepted
 trade-off: no login for students). It shows a name and attendance only, and is
 rate limited. Staff phones keep a copy of the student list so they can scan
-offline; signing out wipes it.
+offline; signing out wipes it (and needs a connection, so a shared phone can be
+handed over only when it can reach the server). A session that merely expires
+keeps the copy and the unsent scans, so nothing is lost when someone signs in
+again.
+
+## The CSV export
+
+The report's CSV has fixed English column names and opens in Excel with Arabic
+names intact. Excel drops leading zeros and shortens very long numbers in the
+`student_id` column: if your IDs look like that, import the file with the ID
+column set to Text (Data > From Text/CSV).
