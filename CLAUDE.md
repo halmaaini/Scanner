@@ -1,36 +1,50 @@
 # CLAUDE.md
 
-Two agents work on this repo and hand off through committed markdown: **Claude
-Code** writes the code; the **Replit agent** runs and publishes it. Start with
-`README.md` (what the app is, and the table of single sources of truth), then:
+Two agents work on this repo: **Claude Code** builds; the **Replit agent** (the
+Replit app "Scanner") runs it, checks it and makes small fixes. Either may push
+to GitHub (`halmaaini/Scanner`). Start with `README.md` (what the app is, and
+the table of single sources of truth); `docs/admin-sql.md` is how the owner
+operates the system (tested SQL).
 
-- `Claude Handoffs/README.md`: the loop · `HANDOFFS.md`: the round ledger
-- `Replit Handoffs/`: Replit's per-round reports · `Replit Requests/`: its inbound briefs
-- `docs/admin-sql.md`: how the owner operates the system (tested SQL)
+## How we work together
 
-**Follow the loop below. Do not skip the reviewer gate. If something needs a
-decision that is the user's to make, stop and ask; do not decide for them.**
-
-## The loop (every round)
-
-1. **Start**: read the latest `Replit Handoffs/*.md` report, scan `Replit Requests/` for open (🆕) briefs, glance at `HANDOFFS.md`.
-2. **Scope + mark started**: a round is one coherent batch. If scope is unclear, ask. Set the round's `HANDOFFS.md` status to `🚧 in progress (Claude)`.
-3. **Implement** on the branch you were assigned (code only; see "Working agreement").
-4. **Reviewer gate (mandatory)**: see below.
-5. **Ship**: commit, push the assigned branch. Merge to `main` only when the user has said to.
-6. **Hand off**: run `/handoff`: write `Claude Handoffs/NNN-slug.md` (commit hash, exact runtime steps, reviewer verdicts) and flip the ledger row to `📤 pending Replit`.
-7. Give the user the paste-ready line for Replit: _read `Claude Handoffs/NNN-slug.md`_.
-8. Keep Q&A in chat; only the two bookend docs per round are durable.
-
-## Reviewer gate
-
-After the work is written, spawn a **separate reviewer agent** (fresh context, not the author). For each change it checks: _does it resolve the root cause · no regressions · complete, not stubbed_, plus the **change checklist** below. It returns PASS/FAIL with a note; FAIL means fix and re-review. Record the verdicts in the handoff.
-
-## Working agreement
-
-- Claude makes **code** changes only. The Replit agent runs **runtime** steps (install, restart, publish) and works in the **development** database; it cannot write the published (Production) one. The owner does that with SQL (`docs/admin-sql.md`).
-- **Never run `db push`/`drizzle-kit push`**: it needs a TTY and fails on Replit. Schema changes are versioned migrations that the API server applies when it starts.
-- Every change keeps the single-source-of-truth rule: **define a fact once, derive the rest.** No second copy of a rule, a list of values, a calculation or an endpoint that says the same thing.
+- **Talk through the Replit connector** (`ask_question`; the app's id is
+  `bf45b388-b428-4e35-a52f-06219c079b61`, or look it up with
+  `resolve_app_by_name "Scanner"`, never guess). The call times out after 60 s
+  and a late answer is lost: ask one small thing at a time, and read results
+  from GitHub rather than trusting relayed text (a relayed hash can be
+  garbled). `list_app_files` / `read_app_file` read the workspace directly.
+- **Git is the meeting point.** `main` is what Replit runs. Claude builds on
+  branches (any name, `claude/...`) and merges to `main` when it works; Replit
+  pushes its own changes (config, small fixes) to a `replit/...` branch or to
+  `main`. Fetch and merge what the other pushed before you push `main`, and
+  never force-push it. Name a commit by its full hash when it matters.
+- **Never put real data in Git or in chat**: rosters, CSVs, exports, dumps,
+  password hashes. Replit's development database holds the real graduate
+  roster. `.gitignore` covers the usual files; check `git diff --stat` before
+  a push, and remember that history keeps whatever was once committed.
+- **Ask the owner first** before: publishing, anything that writes the
+  Production database, billing or account settings, or anything else that
+  touches real data. Restarting the development app is fine: ask Replit.
+- **Checks are light. There is no CI.** Before pushing, run
+  `pnpm run typecheck` and the unit tests for what you changed (see
+  "Verify"); run the browser tests when a change touches scanning or the
+  offline queue. Replit runs the app and reports what is broken. If it works,
+  ship it; if something breaks, fix it.
+- **Replit proposes tasks** as a short markdown file in `Replit Requests/`
+  (one per idea or bug, from `_TEMPLATE.md`) or through the connector; Claude
+  decides and builds. Scan that folder when you start.
+- Claude makes the **code** changes; Replit's are small (config, obvious
+  fixes). Replit works in the **development** database and cannot write the
+  published (Production) one: the owner does that with SQL
+  (`docs/admin-sql.md`).
+- **Never run `db push`/`drizzle-kit push`**: it needs a TTY and fails on
+  Replit. Schema changes are versioned migrations that the API server applies
+  when it starts. **Replit's development database has already applied the
+  existing migrations (with real data in it): never edit one, add a new one.**
+- Every change keeps the single-source-of-truth rule: **define a fact once,
+  derive the rest.** No second copy of a rule, a list of values, a calculation
+  or an endpoint that says the same thing.
 
 ## Change checklist (what a change usually touches)
 
@@ -53,7 +67,7 @@ Work top to bottom and stop where the change no longer reaches.
 - TypeScript, strict; `pnpm run typecheck` at the root builds the shared libs first (a package's own `typecheck` will complain until they are built).
 - Generated code (`lib/api-zod`, `lib/api-client-react/src/generated`, `lib/db/migrations`) is committed and never hand-edited. Prettier ignores it. (`lib/api-client-react/src/custom-fetch.ts` is hand-written.)
 - Format with `pnpm format`. Comments explain _why_, not what; no dead code, no half-finished features.
-- Tests live next to the code (`*.test.ts`). The database and API tests are **skipped, with a warning**, unless `TEST_DATABASE_URL` is set (so say in a handoff whether they ran); they wipe that database, and refuse any whose name does not contain `test`.
+- Tests live next to the code (`*.test.ts`). The database and API tests are **skipped, with a warning**, unless `TEST_DATABASE_URL` is set (so say when they did not run); they wipe that database, and refuse any whose name does not contain `test`.
 - The scanner must keep working with no connection: a change to scanning or the roster needs an offline test in `e2e/tests/offline.spec.ts` or a unit test in `web/src/offline`.
 - Plain, friendly wording in the UI. The prototype's look (ivory, navy, gold; green/amber/red results) is the design system.
 

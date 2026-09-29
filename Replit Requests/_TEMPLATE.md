@@ -1,14 +1,14 @@
-<!-- Copy to NNN-<slug>.md (own sequence, separate from rounds). Self-contained: Claude reads ONLY this file. Delete these notes. -->
+<!-- Copy to NNN-<slug>.md (this folder's own sequence). Self-contained: Claude reads ONLY this file. Never paste real data (names, IDs, rosters). Delete these notes. -->
 
 # Request NNN: <Title>
 
-|              |                                                     |
-| ------------ | --------------------------------------------------- |
-| **Date**     | <YYYY-MM-DD>                                        |
-| **From**     | Replit · or user via Replit                         |
-| **Type**     | bug · feature · spec · question                     |
-| **Priority** | low · normal · high                                 |
-| **Status**   | 🆕 new · 👀 Claude on it · ✅ addressed (round NNN) |
+|              |                                                         |
+| ------------ | ------------------------------------------------------- |
+| **Date**     | <YYYY-MM-DD>                                            |
+| **From**     | Replit · or user via Replit                             |
+| **Type**     | bug · feature · spec · question                         |
+| **Priority** | low · normal · high                                     |
+| **Status**   | 🆕 new · 👀 Claude on it · ✅ addressed (commit <hash>) |
 
 ## What & why
 
