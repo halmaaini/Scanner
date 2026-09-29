@@ -16,6 +16,8 @@ else (import, revoke, open events, create admins) is SQL; see `docs/admin-sql.md
 - `pnpm --filter @workspace/db run generate`: write a new SQL migration after a schema change (Claude does this; you do not need to).
 - `pnpm --filter @workspace/scripts run sql <file.sql>`: run a SQL file (no TTY needed) against `DATABASE_URL` (in a workspace shell, the **development** database). It prints `SELECT` results. `lib/db/sql/seed-demo.sql` is development-only demo data and refuses to load into a database that holds anything else.
 
+The student roster can include a nullable `major` column. It appears on the public card for anyone who knows the student ID, the staff scan result, the report search results, and the CSV export. Keep real roster CSVs outside the project directory so they cannot be committed to Git.
+
 Environment:
 
 | Variable                             | Meaning                                                                        |

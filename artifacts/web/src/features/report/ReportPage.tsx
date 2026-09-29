@@ -128,6 +128,11 @@ export function ReportPage() {
                       <span className="text-sm text-muted">
                         {student.studentId}
                       </span>
+                      {student.major && (
+                        <span className="text-sm text-muted">
+                          {m.report.major}: <bdi>{student.major}</bdi>
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {!student.isActive && (

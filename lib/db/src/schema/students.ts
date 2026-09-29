@@ -15,6 +15,7 @@ export const studentsTable = pgTable(
   {
     studentId: text("student_id").primaryKey(),
     fullName: text("full_name").notNull(),
+    major: text("major"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

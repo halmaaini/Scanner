@@ -70,6 +70,11 @@ export interface Event {
 export interface Student {
   studentId: string;
   fullName: string;
+  /**
+     * Field of study, when supplied by the roster. May be absent from older offline copies.
+     * @nullable
+     */
+  major?: string | null;
   /** False once the student's access has been revoked. */
   isActive: boolean;
 }
@@ -170,6 +175,11 @@ export interface CardEvent {
 export interface Card {
   studentId: string;
   fullName: string;
+  /**
+     * Field of study, when supplied by the roster.
+     * @nullable
+     */
+  major?: string | null;
   isActive: boolean;
   /** Only the events this student is registered for, in event order. */
   events: CardEvent[];

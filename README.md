@@ -8,7 +8,7 @@ general enough to reuse.
   are saved on the phone and sent when the signal returns.
 - **One super admin** also gets an attendance report with CSV export.
 - **Attendees** open a public page, type their student ID, and see their card
-  (with the QR code) and which events they have attended.
+  (with the QR code, major when available) and which events they have attended.
 - **Everything else is SQL**: importing students, revoking and renewing,
   opening events, creating admins. See [`docs/admin-sql.md`](docs/admin-sql.md).
 
@@ -135,7 +135,8 @@ create the super admin with SQL (see the cookbook).
 ## Privacy
 
 The student page is open to anyone who knows an ID (a deliberate, accepted
-trade-off: no login for students). It shows a name and attendance only, and is
+trade-off: no login for students). It shows a name, major when available, and
+attendance, and is
 rate limited. Staff phones keep a copy of the student list so they can scan
 offline; signing out wipes it (and needs a connection, so a shared phone can be
 handed over only when it can reach the server). A session that merely expires
@@ -144,7 +145,7 @@ again.
 
 ## The CSV export
 
-The report's CSV has fixed English column names and opens in Excel with Arabic
-names intact. Excel drops leading zeros and shortens very long numbers in the
+The report's CSV has fixed English column names, includes the major, and opens
+in Excel with Arabic names intact. Excel drops leading zeros and shortens very long numbers in the
 `student_id` column: if your IDs look like that, import the file with the ID
 column set to Text (Data > From Text/CSV).

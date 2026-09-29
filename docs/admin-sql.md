@@ -137,26 +137,30 @@ DELETE FROM events WHERE id = 'workshop';
 
 ### Import
 
-Add students (re-running it updates names, so it is safe to repeat):
+Add students (re-running it updates names and majors, so it is safe to repeat).
+Leave the major `NULL` when the roster does not supply one:
 
 ```sql
-INSERT INTO students (student_id, full_name) VALUES
-  ('1011', 'Hanan Said'),
-  ('1012', 'خالد المصري'),
-  ('1013', 'Tariq Anwar')
-ON CONFLICT (student_id) DO UPDATE SET full_name = EXCLUDED.full_name;
+INSERT INTO students (student_id, full_name, major) VALUES
+  ('1011', 'Hanan Said', 'Engineering'),
+  ('1012', 'خالد المصري', NULL),
+  ('1013', 'Tariq Anwar', 'Business')
+ON CONFLICT (student_id) DO UPDATE
+  SET full_name = EXCLUDED.full_name, major = EXCLUDED.major;
 ```
 
-From a spreadsheet, save it as CSV (UTF-8) with the columns `student_id` and
-`full_name`, keep the file in your home folder, then use psql's `\copy`:
+From a spreadsheet, save it as CSV (UTF-8) with the columns `student_id`,
+`full_name` and `major`, keep the file in your home folder, then use psql's `\copy`.
+An empty major imports as `NULL`:
 
 ```bash
-psql "$DATABASE_URL" -c "\copy students (student_id, full_name) FROM '$HOME/students.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
+psql "$DATABASE_URL" -c "\copy students (student_id, full_name, major) FROM '$HOME/students.csv' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
 ```
 
 No psql? Build the `VALUES` lines in the spreadsheet with a formula such as
-`="('"&A2&"', '"&SUBSTITUTE(B2,"'","''")&"'),"` and paste them into the block
-above (the last line ends with `;` instead of `,`).
+`="('"&A2&"', '"&SUBSTITUTE(B2,"'","''")&"', '"&SUBSTITUTE(C2,"'","''")&"'),"`
+and paste them into the block above (the last line ends with `;` instead of `,`).
+Use `NULL` instead of `''` for a missing major.
 
 A new student is on **no** event list yet; see [Event lists](#event-lists).
 

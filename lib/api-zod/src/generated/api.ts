@@ -78,6 +78,7 @@ export const GetRosterResponse = zod.object({
   "students": zod.array(zod.object({
   "studentId": zod.string(),
   "fullName": zod.string(),
+  "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 })),
   "registrations": zod.array(zod.object({
@@ -123,6 +124,7 @@ export const SubmitScansResponse = zod.object({
   "student": zod.union([zod.object({
   "studentId": zod.string(),
   "fullName": zod.string(),
+  "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 }),zod.null()]).describe('Null when the student ID is unknown.'),
   "registration": zod.union([zod.object({
@@ -173,6 +175,7 @@ export const GetCardParams = zod.object({
 export const GetCardResponse = zod.object({
   "studentId": zod.string(),
   "fullName": zod.string(),
+  "major": zod.string().nullish().describe('Field of study, when supplied by the roster.'),
   "isActive": zod.boolean(),
   "events": zod.array(zod.object({
   "id": zod.string(),

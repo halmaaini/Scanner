@@ -11,6 +11,11 @@ import type { CardEvent } from './cardEvent';
 export interface Card {
   studentId: string;
   fullName: string;
+  /**
+     * Field of study, when supplied by the roster.
+     * @nullable
+     */
+  major?: string | null;
   isActive: boolean;
   /** Only the events this student is registered for, in event order. */
   events: CardEvent[];

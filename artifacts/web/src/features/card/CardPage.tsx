@@ -102,6 +102,11 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
             <p className="text-[15px] text-on-dark">
               {m.results.studentLine(card.studentId)}
             </p>
+            {card.major && (
+              <p className="text-sm text-on-dark">
+                {m.card.major}: <bdi>{card.major}</bdi>
+              </p>
+            )}
           </div>
         </header>
 
