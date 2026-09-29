@@ -219,13 +219,23 @@ export function ScannerPage() {
                   </option>
                 ))}
               </select>
-              {replaced && (
-                <p role="status" className="text-sm font-semibold text-warn">
-                  {m.scanner.eventReplaced(
-                    index?.eventById.get(replaced)?.name ?? replaced,
-                    index?.eventById.get(eventId ?? "")?.name ?? "",
-                  )}
-                </p>
+              {replaced && eventId && (
+                <div className="flex items-center justify-between gap-3">
+                  <p role="status" className="text-sm font-semibold text-warn">
+                    {m.scanner.eventReplaced(
+                      index?.eventById.get(replaced)?.name ?? replaced,
+                      index?.eventById.get(eventId)?.name ?? "",
+                    )}
+                  </p>
+                  {/* Choosing the event in use remembers it, which ends the notice. */}
+                  <button
+                    type="button"
+                    onClick={() => chooseEvent(eventId)}
+                    className={buttonStyles.link}
+                  >
+                    {m.common.dismiss}
+                  </button>
+                </div>
               )}
             </div>
 

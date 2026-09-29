@@ -1,4 +1,3 @@
-import { LoaderCircle } from "lucide-react";
 import { useState, type FormEvent, type Ref } from "react";
 import { Button } from "@/components/Button";
 import { Field } from "@/components/Field";
@@ -59,16 +58,9 @@ export function ManualEntry({
         type="submit"
         size="compact"
         disabled={disabled || !value.trim()}
-        aria-busy={checking}
+        busy={checking}
       >
-        {checking ? (
-          <>
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-            {m.scanner.checking}
-          </>
-        ) : (
-          m.scanner.checkIn
-        )}
+        {checking ? m.scanner.checking : m.scanner.checkIn}
       </Button>
     </form>
   );

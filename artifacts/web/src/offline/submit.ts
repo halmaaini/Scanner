@@ -48,7 +48,8 @@ export interface ScanInput {
  * anything already waiting, in order). If the server answers, that answer is
  * the truth. If it cannot be reached, the scan stays queued and the person is
  * shown what the saved list predicts, clearly marked as offline. A scan that
- * would not be recorded anyway is not kept.
+ * would not be recorded anyway is not kept, unless a request carrying it may
+ * have reached the server (a timeout, a server error): then the server decides.
  *
  * Returns null when there was nothing to scan (blank input).
  */
@@ -97,7 +98,7 @@ export async function submitScan(
     engine.cancel(scan.id);
     return { kind: "unavailable" };
   }
-  // (If a background send already has it on the wire it stands, and the server decides.)
+  // (If a request carrying it may have reached the server, it stands and the server decides.)
   if (predicted.outcome !== "checked_in") engine.cancel(scan.id);
   return { kind: "offline", result: predicted, opId: scan.id };
 }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { downloadTextFile } from "./download";
+import { RELEASE_DOWNLOAD_MS } from "@/config";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -26,7 +27,7 @@ describe("downloadTextFile", () => {
     expect(link.click).toHaveBeenCalledTimes(1);
     // Not yet: some browsers start the download after this function returns.
     expect(revoked).toEqual([]);
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(RELEASE_DOWNLOAD_MS);
     expect(revoked).toEqual(["blob:test"]);
   });
 });

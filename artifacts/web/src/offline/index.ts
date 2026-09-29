@@ -41,12 +41,16 @@ export const outbox = createOutbox(appStorage, STORAGE_KEYS.outbox);
 export const syncEngine = createSyncEngine({
   outbox,
   api: {
-    submitScans: async (scans, signal, interactive) =>
-      (
-        await bounded(signal, interactive, (limited) =>
-          submitScans({ scans }, { signal: limited }),
-        )
-      ).results,
+    submitScans: async (scans, signal, interactive) => {
+      const answer = await bounded(signal, interactive, (limited) =>
+        submitScans({ scans }, { signal: limited }),
+      );
+      // Not a TypeError: an answer that came back empty is not a failed connection.
+      if (!answer || !Array.isArray(answer.results)) {
+        throw new Error("The server's answer could not be read");
+      }
+      return answer.results;
+    },
     // The generated URL builders do not escape path parameters; IDs may contain "/".
     undoCheckIn: (eventId, studentId, signal, interactive) =>
       bounded(signal, interactive, (limited) =>

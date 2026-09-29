@@ -278,7 +278,14 @@ async function parseJsonBody(
   response: Response,
   requestInfo: { method: string; url: string },
 ): Promise<unknown> {
-  const raw = await response.text();
+  let raw: string;
+  try {
+    raw = await response.text();
+  } catch (cause) {
+    // The body stopped arriving part-way (a dropped connection): as unreadable
+    // as bad JSON, and unlike a failed fetch the server did get the request.
+    throw new ResponseParseError(response, "", cause, requestInfo);
+  }
   const normalized = stripBom(raw);
 
   if (normalized.trim() === "") {

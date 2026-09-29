@@ -63,13 +63,43 @@ describe.skipIf(!testUrl)("database schema (needs TEST_DATABASE_URL)", () => {
       [username, role],
     );
 
-  it("applies migrations repeatedly and concurrently without error", async () => {
-    await runMigrations(migrationsFolder);
-    await Promise.all([
+  it("applies migrations repeatedly without error, recording each once", async () => {
+    expect((await runMigrations(migrationsFolder)).outcome).toBe("up-to-date");
+    expect((await runMigrations(migrationsFolder)).outcome).toBe("up-to-date");
+    const { rows } = await sql(
+      "select count(*)::int as n from drizzle.__drizzle_migrations",
+    );
+    expect(rows[0].n).toBe(migrationCount);
+  });
+
+  // The advisory lock is what makes several instances starting together safe:
+  // without it the second one meets tables the first is still creating.
+  it("lets exactly one of several simultaneous starts migrate an empty database", async () => {
+    await sql("drop schema drizzle cascade");
+    await sql("drop schema public cascade");
+    await sql("create schema public");
+
+    const starts = await Promise.allSettled([
       runMigrations(migrationsFolder),
       runMigrations(migrationsFolder),
       runMigrations(migrationsFolder),
     ]);
+
+    expect(starts.map((start) => start.status)).toEqual([
+      "fulfilled",
+      "fulfilled",
+      "fulfilled",
+    ]);
+    const outcomes = starts.map(
+      (start) =>
+        (start as PromiseFulfilledResult<{ outcome: string }>).value.outcome,
+    );
+    expect(outcomes.filter((outcome) => outcome === "migrated")).toHaveLength(
+      1,
+    );
+    expect(outcomes.filter((outcome) => outcome === "up-to-date")).toHaveLength(
+      2,
+    );
     const { rows } = await sql(
       "select count(*)::int as n from drizzle.__drizzle_migrations",
     );

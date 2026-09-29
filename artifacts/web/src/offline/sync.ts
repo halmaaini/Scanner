@@ -80,7 +80,9 @@ export interface SyncEngine {
   /**
    * Takes a change back off the queue, if the server cannot have it: no
    * request has carried it, or the only ones that did met no connection.
-   * Returns whether it did; if not, the change stands.
+   * Returns whether it did; if not, the change stands. (A connection that
+   * drops after the server applied a change looks like one that never
+   * connected; that rare case is accepted.)
    */
   cancel(opId: string): boolean;
   getStatus(): SyncStatus;
