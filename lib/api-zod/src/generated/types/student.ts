@@ -15,6 +15,12 @@ export interface Student {
      * @nullable
      */
   major?: string | null;
+  /**
+     * A note for staff about this student (never on the public card). May be absent from older offline copies.
+     * @maxLength 300
+     * @nullable
+     */
+  note?: string | null;
   /** False once the student's access has been revoked. */
   isActive: boolean;
 }

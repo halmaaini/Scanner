@@ -21,6 +21,8 @@ export interface ResultDescription {
   rows: ResultRow[];
   /** Guidance for the person at the door. */
   note?: string;
+  /** The student whose note can be shown and edited; null when the ID is unknown. */
+  noteTarget: { studentId: string; note: string | null } | null;
   /** Set when the answer came from the saved list because the server was out of reach. */
   offlineNote?: string;
 }
@@ -135,6 +137,12 @@ export function describeResult(context: Context): ResultDescription {
     ...base,
     name: result.student?.fullName ?? m.results.unknownName,
     idLine: m.results.studentLine(result.studentId),
+    noteTarget: result.student
+      ? {
+          studentId: result.student.studentId,
+          note: result.student.note ?? null,
+        }
+      : null,
     rows: [
       ...(result.student?.major
         ? [{ label: m.results.major, value: result.student.major }]

@@ -7,6 +7,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface EventOpenChange {
-  isOpen: boolean;
+export interface StudentNoteChange {
+  /**
+     * The new note; null or empty clears it.
+     * @maxLength 300
+     * @nullable
+     */
+  note: string | null;
 }

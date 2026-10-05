@@ -7,28 +7,27 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CardEvent {
-  id: string;
-  name: string;
-  sortOrder: number;
+/**
+ * The fields to change; leave out what stays as it is.
+ */
+export interface EventChange {
+  isOpen?: boolean;
   /**
-     * When it starts (UTC, ISO 8601), if set.
+     * When it starts (UTC, ISO 8601); null clears it.
      * @nullable
      */
-  startsAt: string | null;
+  startsAt?: string | null;
   /**
-     * Where it is, if set.
+     * Where it is; null or empty clears it.
+     * @maxLength 200
      * @nullable
      */
-  venue: string | null;
+  venue?: string | null;
   /**
-     * A web link to the venue's map, if set.
+     * A web link (http or https) to the venue's map; null or empty clears it.
+     * @maxLength 500
      * @nullable
+     * @pattern ^(https?://\S+)?$
      */
-  mapUrl: string | null;
-  /**
-     * When the student checked in (UTC, ISO 8601); null until then.
-     * @nullable
-     */
-  checkedInAt: string | null;
+  mapUrl?: string | null;
 }

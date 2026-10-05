@@ -6,6 +6,7 @@ import eventsRouter from "./events";
 import healthRouter from "./health";
 import rosterRouter from "./roster";
 import scansRouter from "./scans";
+import studentsRouter from "./students";
 
 export interface RouterOptions {
   /** Guards POST /auth/login; counts failed attempts only. */
@@ -26,6 +27,7 @@ export function createRouter({
   router.use(scansRouter);
   router.use(checkInsRouter);
   router.use(eventsRouter);
+  router.use(studentsRouter);
   router.use(createCardsRouter(cardLimiter));
 
   return router;

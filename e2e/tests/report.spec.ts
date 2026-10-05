@@ -121,6 +121,24 @@ test.describe("the report", () => {
     // Nine students on two events plus three on the trophy list, and the revoked one on two.
     expect(text.trim().split("\r\n")).toHaveLength(1 + 10 * 2 + 3);
   });
+
+  test("adds, changes and removes a student's note", async ({ page }) => {
+    const row = page.getByRole("listitem").filter({ hasText: "Omar Haddad" });
+
+    await row.getByRole("button", { name: "Add a note" }).click();
+    await row.getByLabel("Note").fill("Collects for a friend");
+    await row.getByRole("button", { name: "Save note" }).click();
+    await expect(row.getByRole("note")).toHaveText("Collects for a friend");
+    expect(
+      await sql("select note from students where student_id = '1007'"),
+    ).toEqual([{ note: "Collects for a friend" }]);
+
+    await row.getByRole("button", { name: "Remove note" }).click();
+    await expect(row.getByRole("note")).toHaveCount(0);
+    expect(
+      await sql("select note from students where student_id = '1007'"),
+    ).toEqual([{ note: null }]);
+  });
 });
 
 test.describe("an admin", () => {

@@ -56,6 +56,7 @@ describeWithDb("scans", () => {
           studentId: "1001",
           fullName: "Layla Hassan",
           major: null,
+          note: null,
           isActive: true,
         },
         registration: {
@@ -124,6 +125,7 @@ describeWithDb("scans", () => {
       studentId: "1002",
       fullName: "Karim",
       major: null,
+      note: null,
       isActive: false,
     });
     // Nothing was recorded.

@@ -29,7 +29,7 @@ import type {
   BadRequestResponse,
   Card,
   Event,
-  EventOpenChange,
+  EventChange,
   ForbiddenResponse,
   HealthStatus,
   LoginInput,
@@ -40,6 +40,8 @@ import type {
   ScanBatch,
   ScanBatchResult,
   SessionResult,
+  Student,
+  StudentNoteChange,
   TooManyRequestsResponse,
   UnauthorizedResponse
 } from './api.schemas';
@@ -707,7 +709,7 @@ export const useUndoCheckIn = <TError = ErrorType<BadRequestResponse | Unauthori
       return useMutation(getUndoCheckInMutationOptions(options), queryClient);
     }
 
-export const getSetEventOpenUrl = (eventId: string,) => {
+export const getUpdateEventUrl = (eventId: string,) => {
 
 
 
@@ -716,11 +718,11 @@ export const getSetEventOpenUrl = (eventId: string,) => {
 }
 
 /**
- * Super admin only. Scanners only offer open events; closing one hides it from them but deletes nothing, and scans made offline before it closed are still accepted. Setting the state an event already has succeeds and changes nothing.
- * @summary Open or close an event
+ * Super admin only. Send only what changes. Scanners only offer open events; closing one hides it from them but deletes nothing, and scans made offline before it closed are still accepted. `startsAt`, `venue` and `mapUrl` are what attendees see on their card; send null (or, for the text, an empty string) to clear one. Setting what an event already has succeeds and changes nothing.
+ * @summary Change an event
  */
-export const setEventOpen = async (eventId: string,
-    eventOpenChange: EventOpenChange, options?: Parameters<typeof customFetch>[1]): Promise<Event> => {
+export const updateEvent = async (eventId: string,
+    eventChange: EventChange, options?: Parameters<typeof customFetch>[1]): Promise<Event> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -736,12 +738,12 @@ export const setEventOpen = async (eventId: string,
     }
     return headers;
   };
-return customFetch<Event>(getSetEventOpenUrl(eventId),
+return customFetch<Event>(getUpdateEventUrl(eventId),
   {
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(eventOpenChange)
+    body: JSON.stringify(eventChange)
   }
 );}
 
@@ -749,13 +751,13 @@ return customFetch<Event>(getSetEventOpenUrl(eventId),
 
 
 
-export const getSetEventOpenMutationKey = () => ['setEventOpen'] as const;
+export const getUpdateEventMutationKey = () => ['updateEvent'] as const;
 
-export const getSetEventOpenMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventOpen>>, TError,SetEventOpenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof setEventOpen>>, TError,SetEventOpenMutationVariables, TContext> => {
+export const getUpdateEventMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEvent>>, TError,UpdateEventMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEvent>>, TError,UpdateEventMutationVariables, TContext> => {
 
-const mutationKey = getSetEventOpenMutationKey();
+const mutationKey = getUpdateEventMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -765,10 +767,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEventOpen>>, SetEventOpenMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEvent>>, UpdateEventMutationVariables> = (props) => {
           const {eventId,data} = props ?? {};
 
-          return  setEventOpen(eventId,data,requestOptions)
+          return  updateEvent(eventId,data,requestOptions)
         }
 
 
@@ -778,23 +780,113 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type SetEventOpenMutationResult = NonNullable<Awaited<ReturnType<typeof setEventOpen>>>
-    export type SetEventOpenMutationBody = BodyType<EventOpenChange>
-    export type SetEventOpenMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
-    export type SetEventOpenMutationVariables = {eventId: string;data: BodyType<EventOpenChange>}
+    export type UpdateEventMutationResult = NonNullable<Awaited<ReturnType<typeof updateEvent>>>
+    export type UpdateEventMutationBody = BodyType<EventChange>
+    export type UpdateEventMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>
+    export type UpdateEventMutationVariables = {eventId: string;data: BodyType<EventChange>}
 
     /**
- * @summary Open or close an event
+ * @summary Change an event
  */
-export const useSetEventOpen = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEventOpen>>, TError,SetEventOpenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useUpdateEvent = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEvent>>, TError,UpdateEventMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof setEventOpen>>,
+        Awaited<ReturnType<typeof updateEvent>>,
         TError,
-        SetEventOpenMutationVariables,
+        UpdateEventMutationVariables,
         TContext
       > => {
-      return useMutation(getSetEventOpenMutationOptions(options), queryClient);
+      return useMutation(getUpdateEventMutationOptions(options), queryClient);
+    }
+
+export const getSetStudentNoteUrl = (studentId: string,) => {
+
+
+
+
+  return `/api/students/${studentId}/note`
+}
+
+/**
+ * Any signed-in staff member. A student has one note, shown to staff when the student is scanned or listed; it replaces the previous one and keeps no history. A note never blocks a check-in. Send null (or an empty string) to clear it. The public card never shows it. Needs a connection: it is not queued for later like a scan.
+ * @summary Set or clear a student's note
+ */
+export const setStudentNote = async (studentId: string,
+    studentNoteChange: StudentNoteChange, options?: Parameters<typeof customFetch>[1]): Promise<Student> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Student>(getSetStudentNoteUrl(studentId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(studentNoteChange)
+  }
+);}
+
+
+
+
+
+export const getSetStudentNoteMutationKey = () => ['setStudentNote'] as const;
+
+export const getSetStudentNoteMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setStudentNote>>, TError,SetStudentNoteMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setStudentNote>>, TError,SetStudentNoteMutationVariables, TContext> => {
+
+const mutationKey = getSetStudentNoteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setStudentNote>>, SetStudentNoteMutationVariables> = (props) => {
+          const {studentId,data} = props ?? {};
+
+          return  setStudentNote(studentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetStudentNoteMutationResult = NonNullable<Awaited<ReturnType<typeof setStudentNote>>>
+    export type SetStudentNoteMutationBody = BodyType<StudentNoteChange>
+    export type SetStudentNoteMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>
+    export type SetStudentNoteMutationVariables = {studentId: string;data: BodyType<StudentNoteChange>}
+
+    /**
+ * @summary Set or clear a student's note
+ */
+export const useSetStudentNote = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setStudentNote>>, TError,SetStudentNoteMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setStudentNote>>,
+        TError,
+        SetStudentNoteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetStudentNoteMutationOptions(options), queryClient);
     }
 
 export const getGetCardUrl = (studentId: string,) => {

@@ -1,9 +1,4 @@
-import {
-  getGetRosterQueryKey,
-  setEventOpen,
-  type Event,
-  type Roster,
-} from "@workspace/api-client-react";
+import { updateEvent, type Event } from "@workspace/api-client-react";
 import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -13,9 +8,10 @@ import { Screen } from "@/components/Screen";
 import { Notice } from "@/features/scanner/Notice";
 import { cn } from "@/lib/cn";
 import { isNetworkError, statusOf } from "@/lib/errors";
-import { queryClient } from "@/lib/queryClient";
+import { patchRoster } from "@/lib/rosterCache";
 import { m } from "@/messages";
 import { useRosterView } from "@/offline/hooks";
+import { EventDetails } from "./EventDetails";
 
 /** The super admin's switchboard: which events scanners offer. Needs a connection. */
 export function EventsPage() {
@@ -27,20 +23,11 @@ export function EventsPage() {
     if (changing) return;
     setChanging(event.id);
     try {
-      const updated = await setEventOpen(event.id, { isOpen: !event.isOpen });
-      // A roster read that began earlier would land after this and put the old state back.
-      await queryClient.cancelQueries({ queryKey: getGetRosterQueryKey() });
-      queryClient.setQueryData<Roster>(
-        getGetRosterQueryKey(),
-        (roster) =>
-          roster && {
-            ...roster,
-            events: roster.events.map((e) =>
-              e.id === updated.id ? updated : e,
-            ),
-          },
-      );
-      void queryClient.invalidateQueries({ queryKey: getGetRosterQueryKey() });
+      const updated = await updateEvent(event.id, { isOpen: !event.isOpen });
+      await patchRoster((roster) => ({
+        ...roster,
+        events: roster.events.map((e) => (e.id === updated.id ? updated : e)),
+      }));
     } catch (error) {
       setNotice(
         statusOf(error) === 403
@@ -92,38 +79,41 @@ export function EventsPage() {
           {view.events.map((event) => (
             <li
               key={event.id}
-              className="flex items-center justify-between gap-3 rounded-2xl bg-surface p-4"
+              className="flex flex-col gap-3 rounded-2xl bg-surface p-4"
             >
-              <span className="flex min-w-0 flex-col">
-                <span className="font-semibold">{event.name}</span>
-                <span
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-semibold">{event.name}</span>
+                  <span
+                    className={cn(
+                      "text-sm font-semibold",
+                      event.isOpen ? "text-ok" : "text-muted",
+                    )}
+                  >
+                    {event.isOpen ? m.events.open : m.events.closed}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={event.isOpen}
+                  aria-label={m.events.toggle(event.name)}
+                  disabled={changing !== null}
+                  onClick={() => void switchEvent(event)}
                   className={cn(
-                    "text-sm font-semibold",
-                    event.isOpen ? "text-ok" : "text-muted",
+                    "relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-60",
+                    event.isOpen ? "bg-ok" : "bg-line",
                   )}
                 >
-                  {event.isOpen ? m.events.open : m.events.closed}
-                </span>
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={event.isOpen}
-                aria-label={m.events.toggle(event.name)}
-                disabled={changing !== null}
-                onClick={() => void switchEvent(event)}
-                className={cn(
-                  "relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-60",
-                  event.isOpen ? "bg-ok" : "bg-line",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block size-6 rounded-full bg-surface transition-transform",
-                    event.isOpen ? "translate-x-7" : "translate-x-1",
-                  )}
-                />
-              </button>
+                  <span
+                    className={cn(
+                      "inline-block size-6 rounded-full bg-surface transition-transform",
+                      event.isOpen ? "translate-x-7" : "translate-x-1",
+                    )}
+                  />
+                </button>
+              </div>
+              <EventDetails event={event} />
             </li>
           ))}
         </ul>

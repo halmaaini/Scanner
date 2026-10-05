@@ -1,4 +1,5 @@
 import {
+  MAX_NOTE_LENGTH,
   MAX_STUDENT_ID_LENGTH,
   STUDENT_ID_FORBIDDEN_PATTERN,
 } from "@workspace/attendance";
@@ -16,6 +17,8 @@ export const studentsTable = pgTable(
     studentId: text("student_id").primaryKey(),
     fullName: text("full_name").notNull(),
     major: text("major"),
+    // One free-text note staff can see and edit; it never blocks a check-in.
+    note: text("note"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -32,5 +35,10 @@ export const studentsTable = pgTable(
       sql`char_length(${t.studentId}) between 1 and ${sql.raw(String(MAX_STUDENT_ID_LENGTH))} and ${t.studentId} is nfkc normalized and ${t.studentId} !~ ${sql.raw(`'${STUDENT_ID_FORBIDDEN_PATTERN}'`)}`,
     ),
     check("students_full_name_check", sql`btrim(${t.fullName}) <> ''`),
+    // Empty means "no note": it is stored as null, never as blank text.
+    check(
+      "students_note_check",
+      sql`${t.note} is null or (btrim(${t.note}) <> '' and char_length(${t.note}) <= ${sql.raw(String(MAX_NOTE_LENGTH))})`,
+    ),
   ],
 );

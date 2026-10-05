@@ -3,8 +3,9 @@ import {
   MAX_STUDENT_ID_LENGTH,
   normalizeStudentId,
 } from "@workspace/attendance";
-import { Check } from "lucide-react";
+import { Check, MapPin } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/Button";
 import { buttonStyles } from "@/components/buttonStyles";
@@ -12,12 +13,13 @@ import { Screen } from "@/components/Screen";
 import { Splash } from "@/components/Splash";
 import { cn } from "@/lib/cn";
 import { isNetworkError, statusOf } from "@/lib/errors";
-import { formatWhen } from "@/lib/format";
+import { formatEventStart, formatWhen } from "@/lib/format";
 import { themeColor } from "@/lib/theme";
 import { CARD_STALE_MS } from "@/config";
 import { m } from "@/messages";
 import { studentIdFromParam } from "./cardPath";
 import { initialsOf } from "./initials";
+import { BigQr } from "./BigQr";
 
 /** Public: a student's card with their QR code and which events they have attended. */
 export function CardPage({ studentId }: { studentId: string }) {
@@ -81,6 +83,7 @@ interface CardViewProps {
 }
 
 function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
+  const [big, setBig] = useState(false);
   return (
     <Screen className="gap-5 pt-8">
       <Link href="/card" className={buttonStyles.link}>
@@ -112,7 +115,12 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
 
         {card.isActive ? (
           <>
-            <div className="self-center rounded-2xl bg-surface p-2">
+            <button
+              type="button"
+              aria-label={m.card.showBig}
+              onClick={() => setBig(true)}
+              className="self-center rounded-2xl bg-surface p-2"
+            >
               <QRCodeSVG
                 value={card.studentId}
                 size={184}
@@ -123,7 +131,7 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
                 role="img"
                 aria-label={m.card.qrLabel(card.studentId)}
               />
-            </div>
+            </button>
             <p className="text-center text-sm text-on-dark">
               {m.card.qrCaption}
             </p>
@@ -175,6 +183,27 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
                   <span className="text-[17px] font-semibold">
                     {event.name}
                   </span>
+                  {event.startsAt && (
+                    <span className="text-sm">
+                      {formatEventStart(event.startsAt)}
+                    </span>
+                  )}
+                  {(event.venue || event.mapUrl) && (
+                    <span className="flex flex-wrap items-center gap-x-3 text-sm">
+                      {event.venue && <bdi>{event.venue}</bdi>}
+                      {event.mapUrl && (
+                        <a
+                          href={event.mapUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-8 items-center gap-1 font-semibold underline underline-offset-4"
+                        >
+                          <MapPin className="size-4" aria-hidden />
+                          {m.card.map}
+                        </a>
+                      )}
+                    </span>
+                  )}
                   <span className="text-sm text-muted">
                     {event.checkedInAt
                       ? m.card.attendedAt(formatWhen(event.checkedInAt))
@@ -194,6 +223,10 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
           })}
         </ul>
       </section>
+
+      {big && (
+        <BigQr studentId={card.studentId} onClose={() => setBig(false)} />
+      )}
 
       <Button variant="outline" busy={refreshing} onClick={onRefresh}>
         {m.card.refresh}

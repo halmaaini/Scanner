@@ -14,4 +14,21 @@ export interface Event {
   sortOrder: number;
   /** Scanners only offer open events. */
   isOpen: boolean;
+  /**
+     * When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.
+     * @nullable
+     */
+  startsAt?: string | null;
+  /**
+     * Where it is, if set.
+     * @maxLength 200
+     * @nullable
+     */
+  venue?: string | null;
+  /**
+     * A web link (http or https) to the venue's map, if set.
+     * @maxLength 500
+     * @nullable
+     */
+  mapUrl?: string | null;
 }

@@ -68,17 +68,29 @@ export const GetCurrentStaffResponse = zod.object({
  * The complete dataset for scanning and reporting: events, students, which students are registered for which event (and whether they have checked in), and the staff names those check-ins point at. It is small by design (hundreds of students) and every screen derives its numbers from it, so counts and lists can never disagree. Scanners keep a copy so they keep working offline.
  * @summary Everything a scanner needs
  */
+export const getRosterResponseEventsItemVenueMax = 200;
+
+export const getRosterResponseEventsItemMapUrlMax = 500;
+
+export const getRosterResponseStudentsItemNoteMax = 300;
+
+
+
 export const GetRosterResponse = zod.object({
   "events": zod.array(zod.object({
   "id": zod.string().describe('Short slug, e.g. `rehearsal`.'),
   "name": zod.string(),
   "sortOrder": zod.int(),
-  "isOpen": zod.boolean().describe('Scanners only offer open events.')
+  "isOpen": zod.boolean().describe('Scanners only offer open events.'),
+  "startsAt": zod.iso.datetime({"offset":true}).nullish().describe('When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.'),
+  "venue": zod.string().max(getRosterResponseEventsItemVenueMax).nullish().describe('Where it is, if set.'),
+  "mapUrl": zod.string().max(getRosterResponseEventsItemMapUrlMax).nullish().describe('A web link (http or https) to the venue\'s map, if set.')
 })),
   "students": zod.array(zod.object({
   "studentId": zod.string(),
   "fullName": zod.string(),
   "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
+  "note": zod.string().max(getRosterResponseStudentsItemNoteMax).nullish().describe('A note for staff about this student (never on the public card). May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 })),
   "registrations": zod.array(zod.object({
@@ -115,6 +127,10 @@ export const SubmitScansBody = zod.object({
 })).min(1).max(submitScansBodyScansMax)
 })
 
+export const submitScansResponseResultsItemStudentOneNoteMax = 300;
+
+
+
 export const SubmitScansResponse = zod.object({
   "results": zod.array(zod.object({
   "id": zod.uuid().describe('The id of the scan this result answers.'),
@@ -125,6 +141,7 @@ export const SubmitScansResponse = zod.object({
   "studentId": zod.string(),
   "fullName": zod.string(),
   "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
+  "note": zod.string().max(submitScansResponseResultsItemStudentOneNoteMax).nullish().describe('A note for staff about this student (never on the public card). May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 }),zod.null()]).describe('Null when the student ID is unknown.'),
   "registration": zod.union([zod.object({
@@ -161,26 +178,79 @@ export const UndoCheckInResponse = zod.object({
 
 
 /**
- * Super admin only. Scanners only offer open events; closing one hides it from them but deletes nothing, and scans made offline before it closed are still accepted. Setting the state an event already has succeeds and changes nothing.
- * @summary Open or close an event
+ * Super admin only. Send only what changes. Scanners only offer open events; closing one hides it from them but deletes nothing, and scans made offline before it closed are still accepted. `startsAt`, `venue` and `mapUrl` are what attendees see on their card; send null (or, for the text, an empty string) to clear one. Setting what an event already has succeeds and changes nothing.
+ * @summary Change an event
  */
-export const setEventOpenPathEventIdMax = 64;
+export const updateEventPathEventIdMax = 64;
 
 
 
-export const SetEventOpenParams = zod.object({
-  "eventId": zod.coerce.string().min(1).max(setEventOpenPathEventIdMax).describe('Event id (a short slug such as `graduation`).')
+export const UpdateEventParams = zod.object({
+  "eventId": zod.coerce.string().min(1).max(updateEventPathEventIdMax).describe('Event id (a short slug such as `graduation`).')
 })
 
-export const SetEventOpenBody = zod.object({
-  "isOpen": zod.boolean()
-})
+export const updateEventBodyVenueMax = 200;
 
-export const SetEventOpenResponse = zod.object({
+export const updateEventBodyMapUrlMax = 500;
+
+
+export const updateEventBodyMapUrlRegExp = new RegExp('^(https?://\\S+)?$');
+
+
+export const UpdateEventBody = zod.object({
+  "isOpen": zod.boolean().optional(),
+  "startsAt": zod.iso.datetime({"offset":true}).nullish().describe('When it starts (UTC, ISO 8601); null clears it.'),
+  "venue": zod.string().max(updateEventBodyVenueMax).nullish().describe('Where it is; null or empty clears it.'),
+  "mapUrl": zod.string().max(updateEventBodyMapUrlMax).regex(updateEventBodyMapUrlRegExp).nullish().describe('A web link (http or https) to the venue\'s map; null or empty clears it.')
+}).describe('The fields to change; leave out what stays as it is.')
+
+export const updateEventResponseVenueMax = 200;
+
+export const updateEventResponseMapUrlMax = 500;
+
+
+
+export const UpdateEventResponse = zod.object({
   "id": zod.string().describe('Short slug, e.g. `rehearsal`.'),
   "name": zod.string(),
   "sortOrder": zod.int(),
-  "isOpen": zod.boolean().describe('Scanners only offer open events.')
+  "isOpen": zod.boolean().describe('Scanners only offer open events.'),
+  "startsAt": zod.iso.datetime({"offset":true}).nullish().describe('When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.'),
+  "venue": zod.string().max(updateEventResponseVenueMax).nullish().describe('Where it is, if set.'),
+  "mapUrl": zod.string().max(updateEventResponseMapUrlMax).nullish().describe('A web link (http or https) to the venue\'s map, if set.')
+})
+
+
+/**
+ * Any signed-in staff member. A student has one note, shown to staff when the student is scanned or listed; it replaces the previous one and keeps no history. A note never blocks a check-in. Send null (or an empty string) to clear it. The public card never shows it. Needs a connection: it is not queued for later like a scan.
+ * @summary Set or clear a student's note
+ */
+export const setStudentNotePathStudentIdMax = 64;
+
+
+
+export const SetStudentNoteParams = zod.object({
+  "studentId": zod.coerce.string().min(1).max(setStudentNotePathStudentIdMax).describe('Student ID exactly as printed on the card.')
+})
+
+export const setStudentNoteBodyNoteMax = 300;
+
+
+
+export const SetStudentNoteBody = zod.object({
+  "note": zod.string().max(setStudentNoteBodyNoteMax).nullable().describe('The new note; null or empty clears it.')
+})
+
+export const setStudentNoteResponseNoteMax = 300;
+
+
+
+export const SetStudentNoteResponse = zod.object({
+  "studentId": zod.string(),
+  "fullName": zod.string(),
+  "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
+  "note": zod.string().max(setStudentNoteResponseNoteMax).nullish().describe('A note for staff about this student (never on the public card). May be absent from older offline copies.'),
+  "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 })
 
 
@@ -205,6 +275,9 @@ export const GetCardResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "sortOrder": zod.int(),
+  "startsAt": zod.iso.datetime({"offset":true}).nullable().describe('When it starts (UTC, ISO 8601), if set.'),
+  "venue": zod.string().nullable().describe('Where it is, if set.'),
+  "mapUrl": zod.string().nullable().describe('A web link to the venue\'s map, if set.'),
   "checkedInAt": zod.iso.datetime({"offset":true}).nullable().describe('When the student checked in (UTC, ISO 8601); null until then.')
 })).describe('Only the events this student is registered for, in event order.')
 })

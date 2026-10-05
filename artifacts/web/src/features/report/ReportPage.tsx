@@ -17,6 +17,7 @@ import { SyncStatus } from "@/features/scanner/SyncStatus";
 import { cn } from "@/lib/cn";
 import { downloadTextFile } from "@/lib/download";
 import { formatDay, formatWhen } from "@/lib/format";
+import { StudentNote } from "@/features/notes/StudentNote";
 import { m } from "@/messages";
 import { scanning } from "@/offline";
 import { useRosterView } from "@/offline/hooks";
@@ -221,60 +222,68 @@ export function ReportPage() {
                 {rows.map(({ student, registration, checkedInByName }) => (
                   <li
                     key={student.studentId}
-                    className="flex items-center justify-between gap-3 border-b border-rule py-3"
+                    className="flex flex-col gap-2 border-b border-rule py-3"
                   >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="font-semibold">
-                        <bdi>{student.fullName}</bdi>
-                      </span>
-                      <span className="text-sm text-muted">
-                        {student.studentId}
-                        {student.major && (
-                          <>
-                            {" · "}
-                            <bdi>{student.major}</bdi>
-                          </>
-                        )}
-                      </span>
-                      <span
-                        className={cn(
-                          "text-sm font-semibold",
-                          registration.checkedInAt ? "text-ok" : "text-muted",
-                        )}
-                      >
-                        {registration.checkedInAt
-                          ? m.report.checkedInAt(
-                              formatWhen(registration.checkedInAt),
-                              checkedInByName,
-                            )
-                          : m.report.notYet}
-                      </span>
-                    </div>
-                    {!student.isActive ? (
-                      <span className="shrink-0 rounded-full bg-bad-soft px-2.5 py-1 text-[13px] font-semibold text-bad">
-                        {m.report.revoked}
-                      </span>
-                    ) : (
-                      !registration.checkedInAt &&
-                      (eventOpen ? (
-                        <Button
-                          variant="outline"
-                          size="compact"
-                          aria-label={m.report.checkInStudent(student.fullName)}
-                          busy={checkingIn === student.studentId}
-                          disabled={checkingIn !== null}
-                          onClick={() =>
-                            void checkIn(student.studentId, student.fullName)
-                          }
-                        >
-                          {m.report.checkIn}
-                        </Button>
-                      ) : (
-                        <span className="shrink-0 text-sm text-muted">
-                          {m.events.closed}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="font-semibold">
+                          <bdi>{student.fullName}</bdi>
                         </span>
-                      ))
-                    )}
+                        <span className="text-sm text-muted">
+                          {student.studentId}
+                          {student.major && (
+                            <>
+                              {" · "}
+                              <bdi>{student.major}</bdi>
+                            </>
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-sm font-semibold",
+                            registration.checkedInAt ? "text-ok" : "text-muted",
+                          )}
+                        >
+                          {registration.checkedInAt
+                            ? m.report.checkedInAt(
+                                formatWhen(registration.checkedInAt),
+                                checkedInByName,
+                              )
+                            : m.report.notYet}
+                        </span>
+                      </div>
+                      {!student.isActive ? (
+                        <span className="shrink-0 rounded-full bg-bad-soft px-2.5 py-1 text-[13px] font-semibold text-bad">
+                          {m.report.revoked}
+                        </span>
+                      ) : (
+                        !registration.checkedInAt &&
+                        (eventOpen ? (
+                          <Button
+                            variant="outline"
+                            size="compact"
+                            aria-label={m.report.checkInStudent(
+                              student.fullName,
+                            )}
+                            busy={checkingIn === student.studentId}
+                            disabled={checkingIn !== null}
+                            onClick={() =>
+                              void checkIn(student.studentId, student.fullName)
+                            }
+                          >
+                            {m.report.checkIn}
+                          </Button>
+                        ) : (
+                          <span className="shrink-0 text-sm text-muted">
+                            {m.events.closed}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    <StudentNote
+                      studentId={student.studentId}
+                      note={student.note}
+                    />
                   </li>
                 ))}
               </ul>

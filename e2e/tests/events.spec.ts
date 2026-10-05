@@ -35,4 +35,36 @@ test.describe("the events page", () => {
       [{ is_open: true }],
     );
   });
+
+  test("saves when and where, which then shows on the student's card", async ({
+    page,
+  }) => {
+    await page
+      .getByRole("button", { name: "Details for Graduation ceremony" })
+      .click();
+    await page.getByLabel("Starts").fill("2026-06-12T09:30");
+    await page.getByLabel("Venue").fill("Main hall");
+    await page.getByLabel("Map link").fill("https://maps.example.com/hall");
+    await page.getByRole("button", { name: "Save details" }).click();
+    await expect(page.getByText("Saved")).toBeVisible();
+
+    expect(
+      await sql("select venue, map_url from events where id = 'graduation'"),
+    ).toEqual([
+      { venue: "Main hall", map_url: "https://maps.example.com/hall" },
+    ]);
+
+    await page.goto("/card/1001");
+    await expect(page.getByText("Main hall")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open map" })).toHaveAttribute(
+      "href",
+      "https://maps.example.com/hall",
+    );
+
+    // The QR can be shown much larger, on plain white.
+    await page.getByRole("button", { name: "Show a bigger QR" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Large QR code" }),
+    ).toBeVisible();
+  });
 });

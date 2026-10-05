@@ -1,3 +1,4 @@
+import { pool } from "@workspace/db";
 import { expect, it } from "vitest";
 import {
   addEvent,
@@ -35,12 +36,18 @@ describeWithDb("cards", () => {
           id: "rehearsal",
           name: "Rehearsal",
           sortOrder: 1,
+          startsAt: null,
+          venue: null,
+          mapUrl: null,
           checkedInAt: "2026-06-11T09:14:00.000Z",
         },
         {
           id: "graduation",
           name: "Graduation",
           sortOrder: 2,
+          startsAt: null,
+          venue: null,
+          mapUrl: null,
           checkedInAt: null,
         },
       ],
@@ -93,5 +100,23 @@ describeWithDb("cards", () => {
     expect(blocked.body).toEqual({
       error: "Too many requests. Try again later.",
     });
+  });
+
+  it("shows when and where each event is, without the open flag", async () => {
+    await addEvent("graduation", { name: "Graduation" });
+    await pool.query(
+      "update events set starts_at = $1, venue = $2, map_url = $3",
+      ["2026-06-12T08:30:00.000Z", "Main hall", "https://maps.example.com/h"],
+    );
+    await addStudent("1001");
+    await register("1001", "graduation");
+
+    const res = await createClient().get("/api/cards/1001");
+    expect(res.body.events[0]).toMatchObject({
+      startsAt: "2026-06-12T08:30:00.000Z",
+      venue: "Main hall",
+      mapUrl: "https://maps.example.com/h",
+    });
+    expect(res.body.events[0]).not.toHaveProperty("isOpen");
   });
 });

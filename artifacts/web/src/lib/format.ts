@@ -46,3 +46,20 @@ export function formatSpreadsheetTime(iso: string): string {
     `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`
   );
 }
+
+/** "Thu 11 Jun, 09:14": a planned time, always with its day. */
+export function formatEventStart(iso: string): string {
+  return dayAndTime.format(new Date(iso));
+}
+
+/** The value a `datetime-local` input wants ("2026-06-11T09:14"), on this device's clock. */
+export function toDateTimeInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${formatDay(d)}T${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+/** The reverse: an ISO instant for a `datetime-local` value; null when empty. */
+export function fromDateTimeInput(value: string): string | null {
+  return value ? new Date(value).toISOString() : null;
+}

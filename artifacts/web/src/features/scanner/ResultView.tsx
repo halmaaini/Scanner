@@ -2,6 +2,7 @@ import { Check, Clock, LoaderCircle, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { buttonStyles } from "@/components/buttonStyles";
 import { cn } from "@/lib/cn";
+import { StudentNote } from "@/features/notes/StudentNote";
 import { m } from "@/messages";
 import type { ResultDescription, Tone } from "./describeResult";
 
@@ -128,6 +129,14 @@ export function ResultView({
                 </div>
               ))}
             </dl>
+          )}
+          {description.noteTarget && (
+            <div className="mt-3 border-t border-rule pt-4">
+              <StudentNote
+                studentId={description.noteTarget.studentId}
+                note={description.noteTarget.note}
+              />
+            </div>
           )}
         </div>
 

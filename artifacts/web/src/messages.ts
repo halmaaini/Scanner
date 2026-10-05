@@ -219,6 +219,19 @@ export const m = {
     exportCsv: "Export CSV",
   },
 
+  note: {
+    label: "Note",
+    add: "Add a note",
+    edit: "Edit note",
+    clear: "Remove note",
+    save: "Save note",
+    cancel: "Cancel",
+    placeholder: "Anything staff should know about this student",
+    needsConnection:
+      "Couldn't save the note. This needs a connection: check it and try again.",
+    failed: "Couldn't save the note. Try again.",
+  },
+
   events: {
     title: "Events",
     intro:
@@ -227,10 +240,19 @@ export const m = {
     closed: "Closed",
     toggle: (name: string) => `${name}: open for scanning`,
     none: "No events yet.",
-    forbidden: "Only the super admin can open or close events.",
+    forbidden: "Only the super admin can change events.",
     failed: "Couldn't change the event. Try again, or reload the page.",
     needsConnection:
       "Couldn't change the event. This needs a connection: check it and try again.",
+    details: "Details",
+    detailsFor: (name: string) => `Details for ${name}`,
+    startsAt: "Starts",
+    venue: "Venue",
+    mapUrl: "Map link",
+    mapHint: "A web link, such as a Google Maps share link.",
+    save: "Save details",
+    saved: "Saved",
+    invalidLink: "The map link must start with http:// or https://",
     report: "Report",
     scanner: "Scanner",
   },
@@ -265,6 +287,11 @@ export const m = {
     failed: "Couldn't load your card. Check your connection and try again.",
     refresh: "Refresh",
     offlineCopy: "Offline: showing the last saved copy.",
+    map: "Open map",
+    showBig: "Show a bigger QR",
+    bigLabel: "Large QR code",
+    closeBig: "Close",
+    bigHint: "Hold the screen up to the scanner",
   },
 
   notFound: {

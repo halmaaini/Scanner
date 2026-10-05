@@ -49,26 +49,45 @@ describeWithDb("roster", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(res.body).toEqual({
       events: [
-        { id: "rehearsal", name: "Rehearsal", sortOrder: 1, isOpen: false },
-        { id: "graduation", name: "Graduation", sortOrder: 2, isOpen: true },
+        {
+          id: "rehearsal",
+          name: "Rehearsal",
+          sortOrder: 1,
+          isOpen: false,
+          startsAt: null,
+          venue: null,
+          mapUrl: null,
+        },
+        {
+          id: "graduation",
+          name: "Graduation",
+          sortOrder: 2,
+          isOpen: true,
+          startsAt: null,
+          venue: null,
+          mapUrl: null,
+        },
       ],
       students: [
         {
           studentId: "1001",
           fullName: "Layla Hassan",
           major: null,
+          note: null,
           isActive: true,
         },
         {
           studentId: "1002",
           fullName: "Yusuf Ibrahim",
           major: null,
+          note: null,
           isActive: true,
         },
         {
           studentId: "1003",
           fullName: "Karim Nasser",
           major: null,
+          note: null,
           isActive: false,
         },
       ],

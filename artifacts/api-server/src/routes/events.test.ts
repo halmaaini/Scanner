@@ -55,4 +55,61 @@ describeWithDb("open or close an event", () => {
         .status,
     ).toBe(400);
   });
+
+  const change = (client: ReturnType<typeof createClient>, body: object) =>
+    client.patch("/api/events/graduation").send(body);
+
+  it("lets the super admin set, change and clear when and where", async () => {
+    await addEvent("graduation");
+    const client = await signedInAs("boss", "super");
+
+    const set = await change(client, {
+      startsAt: "2026-06-11T09:00:00.000Z",
+      venue: "Main hall",
+      mapUrl: "https://maps.example.com/hall",
+    });
+    expect(set.status).toBe(200);
+    expect(set.body).toMatchObject({
+      startsAt: "2026-06-11T09:00:00.000Z",
+      venue: "Main hall",
+      mapUrl: "https://maps.example.com/hall",
+      isOpen: true,
+    });
+
+    // Only what is sent changes.
+    const renamed = await change(client, { venue: "Hall B" });
+    expect(renamed.body).toMatchObject({
+      venue: "Hall B",
+      mapUrl: "https://maps.example.com/hall",
+    });
+
+    const cleared = await change(client, {
+      startsAt: null,
+      venue: "  ",
+      mapUrl: "",
+    });
+    expect(cleared.body).toMatchObject({
+      startsAt: null,
+      venue: null,
+      mapUrl: null,
+    });
+  });
+
+  it("refuses a map link that is not a web link, and treats an empty change as nothing to do", async () => {
+    await addEvent("graduation");
+    const client = await signedInAs("boss", "super");
+    expect(
+      (await change(client, { mapUrl: "javascript:alert(1)" })).status,
+    ).toBe(400);
+    expect((await change(client, {})).status).toBe(200);
+    expect((await change(client, { mapUrl: "ftp://x.test/a" })).status).toBe(
+      400,
+    );
+  });
+
+  it("keeps plain admins from changing details", async () => {
+    await addEvent("graduation");
+    const client = await signedInAs("sara", "admin");
+    expect((await change(client, { venue: "Hall" })).status).toBe(403);
+  });
 });

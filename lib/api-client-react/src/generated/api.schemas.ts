@@ -65,10 +65,57 @@ export interface Event {
   sortOrder: number;
   /** Scanners only offer open events. */
   isOpen: boolean;
+  /**
+     * When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.
+     * @nullable
+     */
+  startsAt?: string | null;
+  /**
+     * Where it is, if set.
+     * @maxLength 200
+     * @nullable
+     */
+  venue?: string | null;
+  /**
+     * A web link (http or https) to the venue's map, if set.
+     * @maxLength 500
+     * @nullable
+     */
+  mapUrl?: string | null;
 }
 
-export interface EventOpenChange {
-  isOpen: boolean;
+/**
+ * The fields to change; leave out what stays as it is.
+ */
+export interface EventChange {
+  isOpen?: boolean;
+  /**
+     * When it starts (UTC, ISO 8601); null clears it.
+     * @nullable
+     */
+  startsAt?: string | null;
+  /**
+     * Where it is; null or empty clears it.
+     * @maxLength 200
+     * @nullable
+     */
+  venue?: string | null;
+  /**
+     * A web link (http or https) to the venue's map; null or empty clears it.
+     * @maxLength 500
+     * @nullable
+     * @pattern ^(https?://\S+)?$
+     */
+  mapUrl?: string | null;
+}
+
+export interface StudentNoteChange {
+  /**
+     * The new note; null or empty clears it.
+     * @maxLength 300
+     * @nullable
+     */
+  note: string | null;
 }
 
 export interface Student {
@@ -79,6 +126,12 @@ export interface Student {
      * @nullable
      */
   major?: string | null;
+  /**
+     * A note for staff about this student (never on the public card). May be absent from older offline copies.
+     * @maxLength 300
+     * @nullable
+     */
+  note?: string | null;
   /** False once the student's access has been revoked. */
   isActive: boolean;
 }
@@ -169,6 +222,21 @@ export interface CardEvent {
   id: string;
   name: string;
   sortOrder: number;
+  /**
+     * When it starts (UTC, ISO 8601), if set.
+     * @nullable
+     */
+  startsAt: string | null;
+  /**
+     * Where it is, if set.
+     * @nullable
+     */
+  venue: string | null;
+  /**
+     * A web link to the venue's map, if set.
+     * @nullable
+     */
+  mapUrl: string | null;
   /**
      * When the student checked in (UTC, ISO 8601); null until then.
      * @nullable

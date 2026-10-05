@@ -11,3 +11,8 @@ export {
   STUDENT_ID_FORBIDDEN_PATTERN,
   normalizeStudentId,
 } from "./studentId";
+export {
+  MAX_NOTE_LENGTH,
+  MAX_VENUE_LENGTH,
+  MAX_MAP_URL_LENGTH,
+} from "./limits";

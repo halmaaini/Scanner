@@ -96,7 +96,7 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
     return folder;
   }
 
-  const ADD_NOTE = 'ALTER TABLE "students" ADD COLUMN "note" text;';
+  const ADD_NICKNAME = 'ALTER TABLE "students" ADD COLUMN "nickname" text;';
   const INACTIVE_BY_DEFAULT =
     'ALTER TABLE "students" ALTER COLUMN "is_active" SET DEFAULT false;';
 
@@ -219,24 +219,24 @@ describe.skipIf(!testUrl)("migrations (needs TEST_DATABASE_URL)", () => {
   });
 
   it("skips the steps a copy already made and runs the rest", async () => {
-    const folder = withMigration([ADD_NOTE, INACTIVE_BY_DEFAULT]);
-    await pool.query("alter table students add column note text");
+    const folder = withMigration([ADD_NICKNAME, INACTIVE_BY_DEFAULT]);
+    await pool.query("alter table students add column nickname text");
 
     expect(await runMigrations(folder)).toEqual({
       outcome: "migrated",
-      alreadyInPlace: [ADD_NOTE],
+      alreadyInPlace: [ADD_NICKNAME],
     });
     expect(await defaultOf("students", "is_active")).toBe("false");
     expect(await journal()).toHaveLength(journalLength + 1);
   });
 
   it("only records a later migration whose steps a copy has all made", async () => {
-    const folder = withMigration([ADD_NOTE]);
-    await pool.query("alter table students add column note text");
+    const folder = withMigration([ADD_NICKNAME]);
+    await pool.query("alter table students add column nickname text");
 
     expect(await runMigrations(folder)).toEqual({
       outcome: "adopted",
-      alreadyInPlace: [ADD_NOTE],
+      alreadyInPlace: [ADD_NICKNAME],
     });
     expect(await journal()).toHaveLength(journalLength + 1);
   });

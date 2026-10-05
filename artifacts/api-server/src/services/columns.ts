@@ -23,18 +23,33 @@ export function isoTimestamp(column: PgColumn): SQL<string | null> {
   >`to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 }
 
-export const eventColumns = {
+/** What attendees may see about an event (the public card shows exactly this). */
+export const eventInfoColumns = {
   id: eventsTable.id,
   name: eventsTable.name,
   sortOrder: eventsTable.sortOrder,
+  startsAt: isoTimestamp(eventsTable.startsAt),
+  venue: eventsTable.venue,
+  mapUrl: eventsTable.mapUrl,
+};
+
+export const eventColumns = {
+  ...eventInfoColumns,
   isOpen: eventsTable.isOpen,
 };
 
-export const studentColumns = {
+/** What the public card may say about a student. Never add staff-only fields here. */
+export const publicStudentColumns = {
   studentId: studentsTable.studentId,
   fullName: studentsTable.fullName,
   major: studentsTable.major,
   isActive: studentsTable.isActive,
+};
+
+/** A student as staff see them: the public facts plus the staff-only note. */
+export const studentColumns = {
+  ...publicStudentColumns,
+  note: studentsTable.note,
 };
 
 export const registrationColumns = {

@@ -21,6 +21,8 @@ tags:
     description: The dataset a scanner works from
   - name: scans
     description: Submitting scans (online or replayed after being offline)
+  - name: students
+    description: Notes about students
   - name: check-ins
     description: Correcting check-ins
   - name: events
@@ -188,14 +190,16 @@ paths:
           $ref: "#/components/responses/NotFound"
   /events/{eventId}:
     patch:
-      operationId: setEventOpen
+      operationId: updateEvent
       tags: [events]
-      summary: Open or close an event
+      summary: Change an event
       description: >
-        Super admin only. Scanners only offer open events; closing one hides
-        it from them but deletes nothing, and scans made offline before it
-        closed are still accepted. Setting the state an event already has
-        succeeds and changes nothing.
+        Super admin only. Send only what changes. Scanners only offer open
+        events; closing one hides it from them but deletes nothing, and scans
+        made offline before it closed are still accepted. `startsAt`, `venue`
+        and `mapUrl` are what attendees see on their card; send null (or, for
+        the text, an empty string) to clear one. Setting what an event already
+        has succeeds and changes nothing.
       security:
         - sessionCookie: []
       parameters:
@@ -205,7 +209,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EventOpenChange"
+              $ref: "#/components/schemas/EventChange"
       responses:
         "200":
           description: The event after the change
@@ -219,6 +223,40 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /students/{studentId}/note:
+    put:
+      operationId: setStudentNote
+      tags: [students]
+      summary: Set or clear a student's note
+      description: >
+        Any signed-in staff member. A student has one note, shown to staff
+        when the student is scanned or listed; it replaces the previous one
+        and keeps no history. A note never blocks a check-in. Send null (or an
+        empty string) to clear it. The public card never shows it. Needs a
+        connection: it is not queued for later like a scan.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/StudentIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentNoteChange"
+      responses:
+        "200":
+          description: The student after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
   /cards/{studentId}:
@@ -381,13 +419,47 @@ components:
         isOpen:
           type: boolean
           description: Scanners only offer open events.
-    EventOpenChange:
+        startsAt:
+          type: [string, "null"]
+          format: date-time
+          description: When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.
+        venue:
+          type: [string, "null"]
+          maxLength: 200
+          description: Where it is, if set.
+        mapUrl:
+          type: [string, "null"]
+          maxLength: 500
+          description: A web link (http or https) to the venue's map, if set.
+    EventChange:
       type: object
-      required: [isOpen]
+      description: The fields to change; leave out what stays as it is.
       additionalProperties: false
       properties:
         isOpen:
           type: boolean
+        startsAt:
+          type: [string, "null"]
+          format: date-time
+          description: When it starts (UTC, ISO 8601); null clears it.
+        venue:
+          type: [string, "null"]
+          maxLength: 200
+          description: Where it is; null or empty clears it.
+        mapUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://\\S+)?$"
+          description: A web link (http or https) to the venue's map; null or empty clears it.
+    StudentNoteChange:
+      type: object
+      required: [note]
+      additionalProperties: false
+      properties:
+        note:
+          type: [string, "null"]
+          maxLength: 300
+          description: The new note; null or empty clears it.
     Student:
       type: object
       required: [studentId, fullName, isActive]
@@ -399,6 +471,10 @@ components:
         major:
           type: [string, "null"]
           description: Field of study, when supplied by the roster. May be absent from older offline copies.
+        note:
+          type: [string, "null"]
+          maxLength: 300
+          description: A note for staff about this student (never on the public card). May be absent from older offline copies.
         isActive:
           type: boolean
           description: False once the student's access has been revoked.
@@ -525,7 +601,7 @@ components:
             $ref: "#/components/schemas/ScanResult"
     CardEvent:
       type: object
-      required: [id, name, sortOrder, checkedInAt]
+      required: [id, name, sortOrder, startsAt, venue, mapUrl, checkedInAt]
       properties:
         id:
           type: string
@@ -533,6 +609,16 @@ components:
           type: string
         sortOrder:
           type: integer
+        startsAt:
+          type: [string, "null"]
+          format: date-time
+          description: When it starts (UTC, ISO 8601), if set.
+        venue:
+          type: [string, "null"]
+          description: Where it is, if set.
+        mapUrl:
+          type: [string, "null"]
+          description: A web link to the venue's map, if set.
         checkedInAt:
           type: [string, "null"]
           format: date-time
