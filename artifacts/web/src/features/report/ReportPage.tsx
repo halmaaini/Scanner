@@ -38,6 +38,8 @@ export function ReportPage() {
     chosenEvent && view?.events.some((e) => e.id === chosenEvent)
       ? chosenEvent
       : view?.events[0]?.id;
+  // Check-ins are only for open events; a closed one is for looking.
+  const eventOpen = view?.events.find((e) => e.id === eventId)?.isOpen ?? false;
   const rows = useMemo(
     () =>
       view && eventId
@@ -253,7 +255,8 @@ export function ReportPage() {
                         {m.report.revoked}
                       </span>
                     ) : (
-                      !registration.checkedInAt && (
+                      !registration.checkedInAt &&
+                      (eventOpen ? (
                         <Button
                           variant="outline"
                           size="compact"
@@ -266,7 +269,11 @@ export function ReportPage() {
                         >
                           {m.report.checkIn}
                         </Button>
-                      )
+                      ) : (
+                        <span className="shrink-0 text-sm text-muted">
+                          {m.events.closed}
+                        </span>
+                      ))
                     )}
                   </li>
                 ))}

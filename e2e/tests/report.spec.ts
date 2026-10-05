@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, registrationOf, signIn, test } from "../support";
+import { expect, registrationOf, signIn, sql, test } from "../support";
 
 test.describe("the report", () => {
   test.beforeEach(async ({ page }) => {
@@ -65,6 +65,17 @@ test.describe("the report", () => {
 
     await box.fill("zzzz");
     await expect(page.getByText("No students match.")).toBeVisible();
+  });
+
+  test("offers no check-in on a closed event", async ({ page }) => {
+    await sql("update events set is_open = false where id = 'rehearsal'");
+    await page.getByLabel("Find a student").fill("1007");
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "Omar Haddad" }),
+    ).toContainText("Closed");
+    await expect(
+      page.getByRole("button", { name: "Check in Omar Haddad" }),
+    ).toHaveCount(0);
   });
 
   test("checks a student in from the list", async ({ page }) => {
