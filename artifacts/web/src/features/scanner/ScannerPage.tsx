@@ -72,6 +72,8 @@ export function ScannerPage() {
   const scan = useCallback(
     async (raw: string, source: "camera" | "typed") => {
       if (busy.current || !eventId) return;
+      // While a choice is open only the person's tap decides, not a camera read.
+      if (source === "camera" && choices) return;
       let id = raw;
       if (source === "typed" && view) {
         const typed = resolveTypedId(view.students, raw, TYPED_ID_CHOICES);
@@ -110,8 +112,13 @@ export function ScannerPage() {
         setChecking(false);
       }
     },
-    [eventId, staff.id, view],
+    [eventId, staff.id, view, choices],
   );
+
+  // A choice belongs to the event it was typed for: if that changes, it is void.
+  useEffect(() => {
+    setChoices(null);
+  }, [eventId]);
 
   const next = useCallback(() => {
     setAnswer(null);
@@ -274,7 +281,7 @@ export function ScannerPage() {
             )}
 
             <QrCamera
-              paused={answer !== null || checking}
+              paused={answer !== null || checking || choices !== null}
               busy={checking}
               onDecode={(text) => void scan(text, "camera")}
             />

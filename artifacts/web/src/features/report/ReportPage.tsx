@@ -11,7 +11,9 @@ import { buildAttendanceCsv } from "@/domain/export";
 import { summarizeEvents } from "@/domain/summary";
 import { useCurrentStaff } from "@/features/auth/StaffContext";
 import { describeResult } from "@/features/scanner/describeResult";
+import { IssuesBanner } from "@/features/scanner/IssuesBanner";
 import { Notice } from "@/features/scanner/Notice";
+import { SyncStatus } from "@/features/scanner/SyncStatus";
 import { cn } from "@/lib/cn";
 import { downloadTextFile } from "@/lib/download";
 import { formatDay, formatWhen } from "@/lib/format";
@@ -62,13 +64,15 @@ export function ReportPage() {
       if (!response || response.kind === "unavailable") {
         setNotice(m.scanner.noRosterOffline);
       } else {
-        const { title } = describeResult({
+        const { title, offlineNote } = describeResult({
           result: response.result,
           offline: response.kind === "offline",
           eventName: view.events.find((e) => e.id === eventId)?.name ?? eventId,
           staffName: () => undefined,
         });
-        setNotice(`${name}: ${title}`);
+        setNotice(
+          [`${name}: ${title}`, offlineNote].filter(Boolean).join(". "),
+        );
       }
     } catch {
       setNotice(m.scanner.scanFailed);
@@ -164,7 +168,9 @@ export function ReportPage() {
                 >
                   {view.events.map((event) => (
                     <option key={event.id} value={event.id}>
-                      {event.name}
+                      {event.isOpen
+                        ? event.name
+                        : `${event.name} (${m.events.closed})`}
                     </option>
                   ))}
                 </select>
@@ -268,7 +274,11 @@ export function ReportPage() {
             </section>
           )}
 
-          <Button variant="outline" onClick={exportCsv} className="mt-auto">
+          <IssuesBanner view={view} />
+          <div className="mt-auto">
+            <SyncStatus />
+          </div>
+          <Button variant="outline" onClick={exportCsv}>
             <Download className="size-5" aria-hidden />
             {m.report.exportCsv}
           </Button>

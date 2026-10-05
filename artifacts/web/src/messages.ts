@@ -227,6 +227,8 @@ export const m = {
     closed: "Closed",
     toggle: (name: string) => `${name}: open for scanning`,
     none: "No events yet.",
+    forbidden: "Only the super admin can open or close events.",
+    failed: "Couldn't change the event. Try again, or reload the page.",
     needsConnection:
       "Couldn't change the event. This needs a connection: check it and try again.",
     report: "Report",

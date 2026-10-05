@@ -12,6 +12,7 @@ import { buttonStyles } from "@/components/buttonStyles";
 import { Screen } from "@/components/Screen";
 import { Notice } from "@/features/scanner/Notice";
 import { cn } from "@/lib/cn";
+import { isNetworkError, statusOf } from "@/lib/errors";
 import { queryClient } from "@/lib/queryClient";
 import { m } from "@/messages";
 import { useRosterView } from "@/offline/hooks";
@@ -27,6 +28,8 @@ export function EventsPage() {
     setChanging(event.id);
     try {
       const updated = await setEventOpen(event.id, { isOpen: !event.isOpen });
+      // A roster read that began earlier would land after this and put the old state back.
+      await queryClient.cancelQueries({ queryKey: getGetRosterQueryKey() });
       queryClient.setQueryData<Roster>(
         getGetRosterQueryKey(),
         (roster) =>
@@ -37,8 +40,15 @@ export function EventsPage() {
             ),
           },
       );
-    } catch {
-      setNotice(m.events.needsConnection);
+      void queryClient.invalidateQueries({ queryKey: getGetRosterQueryKey() });
+    } catch (error) {
+      setNotice(
+        statusOf(error) === 403
+          ? m.events.forbidden
+          : isNetworkError(error)
+            ? m.events.needsConnection
+            : m.events.failed,
+      );
     } finally {
       setChanging(null);
     }
