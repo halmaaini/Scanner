@@ -69,6 +69,10 @@ test.describe("the report", () => {
 
   test("offers no check-in on a closed event", async ({ page }) => {
     await sql("update events set is_open = false where id = 'rehearsal'");
+    // The report re-reads the list when the page comes back to the front.
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event("visibilitychange")),
+    );
     await page.getByLabel("Find a student").fill("1007");
     await expect(
       page.getByRole("listitem").filter({ hasText: "Omar Haddad" }),
@@ -85,9 +89,10 @@ test.describe("the report", () => {
     const row = page.getByRole("listitem").filter({ hasText: "Omar Haddad" });
     await expect(row).toContainText("Checked in");
     await expect(row).toContainText("by Hala");
-    expect(await registrationOf("1007", "rehearsal")).toMatchObject({
-      by: "Hala",
-    });
+    // The row shows it at once; the server has it a moment later.
+    await expect
+      .poll(async () => (await registrationOf("1007", "rehearsal"))?.by)
+      .toBe("Hala");
   });
 
   test("exports a CSV that opens correctly in a spreadsheet", async ({
