@@ -67,6 +67,10 @@ export interface Event {
   isOpen: boolean;
 }
 
+export interface EventOpenChange {
+  isOpen: boolean;
+}
+
 export interface Student {
   studentId: string;
   fullName: string;

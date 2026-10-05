@@ -1,36 +1,47 @@
 import { Download, LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
+import { can } from "@workspace/attendance";
 import { Button } from "@/components/Button";
 import { buttonStyles } from "@/components/buttonStyles";
 import { Field } from "@/components/Field";
 import { Screen } from "@/components/Screen";
+import { attendeeRows, type AttendeeStatus } from "@/domain/attendees";
 import { buildAttendanceCsv } from "@/domain/export";
-import { searchStudents } from "@/domain/search";
-import { latestCheckIns, summarizeEvents } from "@/domain/summary";
+import { summarizeEvents } from "@/domain/summary";
+import { useCurrentStaff } from "@/features/auth/StaffContext";
+import { describeResult } from "@/features/scanner/describeResult";
+import { Notice } from "@/features/scanner/Notice";
 import { cn } from "@/lib/cn";
 import { downloadTextFile } from "@/lib/download";
 import { formatDay, formatWhen } from "@/lib/format";
-import { REPORT_LATEST_LIMIT, REPORT_SEARCH_LIMIT } from "@/config";
 import { m } from "@/messages";
+import { scanning } from "@/offline";
 import { useRosterView } from "@/offline/hooks";
 
-/** The super admin's overview: progress per event, search, latest check-ins, CSV. */
+const STATUSES: AttendeeStatus[] = ["all", "in", "out"];
+
+/** Progress per event, the list of attendees with who has checked in, and the CSV. */
 export function ReportPage() {
+  const staff = useCurrentStaff();
   const { view, query } = useRosterView();
   const [text, setText] = useState("");
+  const [status, setStatus] = useState<AttendeeStatus>("all");
+  const [chosenEvent, setChosenEvent] = useState<string>();
+  const [checkingIn, setCheckingIn] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const summaries = useMemo(() => (view ? summarizeEvents(view) : []), [view]);
-  const latest = useMemo(
-    () => (view ? latestCheckIns(view, REPORT_LATEST_LIMIT) : []),
-    [view],
-  );
-  const found = useMemo(
+  const eventId =
+    chosenEvent && view?.events.some((e) => e.id === chosenEvent)
+      ? chosenEvent
+      : view?.events[0]?.id;
+  const rows = useMemo(
     () =>
-      view && text.trim()
-        ? searchStudents(view, text, REPORT_SEARCH_LIMIT)
-        : undefined,
-    [view, text],
+      view && eventId
+        ? attendeeRows(view, { eventId, status, query: text })
+        : [],
+    [view, eventId, status, text],
   );
 
   function exportCsv() {
@@ -38,18 +49,50 @@ export function ReportPage() {
     downloadTextFile(`attendance-${formatDay()}.csv`, buildAttendanceCsv(view));
   }
 
+  async function checkIn(studentId: string, name: string) {
+    if (!view || !eventId || checkingIn) return;
+    setCheckingIn(studentId);
+    try {
+      const response = await scanning.scan({
+        raw: studentId,
+        eventId,
+        staffId: staff.id,
+        view,
+      });
+      if (!response || response.kind === "unavailable") {
+        setNotice(m.scanner.noRosterOffline);
+      } else {
+        const { title } = describeResult({
+          result: response.result,
+          offline: response.kind === "offline",
+          eventName: view.events.find((e) => e.id === eventId)?.name ?? eventId,
+          staffName: () => undefined,
+        });
+        setNotice(`${name}: ${title}`);
+      }
+    } catch {
+      setNotice(m.scanner.scanFailed);
+    } finally {
+      setCheckingIn(null);
+    }
+  }
+
   return (
     <Screen width="wide" className="pt-7">
       <header className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[13px] text-muted">{m.report.role}</span>
-          <h1 className="font-display text-[28px] font-semibold">
-            {m.report.title}
-          </h1>
-        </div>
-        <Link href="/scan" className={buttonStyles.link}>
-          {m.report.scanner}
-        </Link>
+        <h1 className="font-display text-[28px] font-semibold">
+          {m.report.title}
+        </h1>
+        <nav className="flex items-center gap-4">
+          {can(staff.role, "manage_events") && (
+            <Link href="/events" className={buttonStyles.link}>
+              {m.report.events}
+            </Link>
+          )}
+          <Link href="/scan" className={buttonStyles.link}>
+            {m.report.scanner}
+          </Link>
+        </nav>
       </header>
 
       {!view ? (
@@ -100,102 +143,128 @@ export function ReportPage() {
             ))}
           </section>
 
-          <Field
-            label={m.report.findStudent}
-            type="search"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={m.report.findPlaceholder}
-            autoComplete="off"
-            spellCheck={false}
-          />
+          {eventId && (
+            <section
+              aria-labelledby="attendees"
+              className="flex flex-col gap-3"
+            >
+              <h2 id="attendees" className="text-lg font-semibold">
+                {m.report.attendees}
+              </h2>
 
-          {found ? (
-            <section aria-live="polite" className="flex flex-col">
-              {found.matches.length === 0 && (
+              <div className="flex flex-col gap-2">
+                <label htmlFor="report-event" className="text-sm font-semibold">
+                  {m.report.event}
+                </label>
+                <select
+                  id="report-event"
+                  value={eventId}
+                  onChange={(e) => setChosenEvent(e.target.value)}
+                  className="h-[52px] w-full rounded-xl border-[1.5px] border-line bg-surface px-3.5 text-[17px] text-ink"
+                >
+                  {view.events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Field
+                label={m.report.findStudent}
+                type="search"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={m.report.findPlaceholder}
+                autoComplete="off"
+                spellCheck={false}
+              />
+
+              <div
+                role="group"
+                aria-label={m.report.filter}
+                className="flex gap-2"
+              >
+                {STATUSES.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={status === value}
+                    onClick={() => setStatus(value)}
+                    className={cn(
+                      "min-h-11 flex-1 rounded-xl border-[1.5px] px-3 text-[15px] font-semibold",
+                      status === value
+                        ? "border-ink bg-ink text-white"
+                        : "border-line bg-surface text-ink",
+                    )}
+                  >
+                    {m.report.filters[value]}
+                  </button>
+                ))}
+              </div>
+
+              <p aria-live="polite" className="text-sm text-muted">
+                {m.report.shown(rows.length)}
+              </p>
+              {rows.length === 0 && (
                 <p className="text-muted">{m.report.noMatches}</p>
               )}
               <ul className="flex flex-col">
-                {found.matches.map(({ student, events }) => (
+                {rows.map(({ student, registration, checkedInByName }) => (
                   <li
                     key={student.studentId}
-                    className="flex flex-col gap-2 border-b border-rule py-3"
+                    className="flex items-center justify-between gap-3 border-b border-rule py-3"
                   >
-                    <div className="flex flex-col">
+                    <div className="flex min-w-0 flex-col">
                       <span className="font-semibold">
                         <bdi>{student.fullName}</bdi>
                       </span>
                       <span className="text-sm text-muted">
                         {student.studentId}
+                        {student.major && (
+                          <>
+                            {" · "}
+                            <bdi>{student.major}</bdi>
+                          </>
+                        )}
                       </span>
-                      {student.major && (
-                        <span className="text-sm text-muted">
-                          {m.report.major}: <bdi>{student.major}</bdi>
-                        </span>
-                      )}
+                      <span
+                        className={cn(
+                          "text-sm font-semibold",
+                          registration.checkedInAt ? "text-ok" : "text-muted",
+                        )}
+                      >
+                        {registration.checkedInAt
+                          ? m.report.checkedInAt(
+                              formatWhen(registration.checkedInAt),
+                              checkedInByName,
+                            )
+                          : m.report.notYet}
+                      </span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {!student.isActive && (
-                        <span className="rounded-full bg-bad-soft px-2.5 py-1 text-[13px] font-semibold text-bad">
-                          {m.report.revoked}
-                        </span>
-                      )}
-                      {events.map(({ event, checkedInAt }) => (
-                        <span
-                          key={event.id}
-                          className={cn(
-                            "rounded-full px-2.5 py-1 text-[13px] font-semibold",
-                            checkedInAt
-                              ? "bg-ok-soft text-ok"
-                              : "bg-track text-muted",
-                          )}
+                    {!student.isActive ? (
+                      <span className="shrink-0 rounded-full bg-bad-soft px-2.5 py-1 text-[13px] font-semibold text-bad">
+                        {m.report.revoked}
+                      </span>
+                    ) : (
+                      !registration.checkedInAt && (
+                        <Button
+                          variant="outline"
+                          size="compact"
+                          aria-label={m.report.checkInStudent(student.fullName)}
+                          busy={checkingIn === student.studentId}
+                          disabled={checkingIn !== null}
+                          onClick={() =>
+                            void checkIn(student.studentId, student.fullName)
+                          }
                         >
-                          {event.name}:{" "}
-                          {checkedInAt
-                            ? formatWhen(checkedInAt)
-                            : m.report.notYet}
-                        </span>
-                      ))}
-                    </div>
+                          {m.report.checkIn}
+                        </Button>
+                      )
+                    )}
                   </li>
                 ))}
               </ul>
-              {found.total > found.matches.length && (
-                <p className="pt-3 text-sm text-muted">
-                  {m.report.firstMatches(found.matches.length)}
-                </p>
-              )}
-            </section>
-          ) : (
-            <section className="flex flex-col">
-              <h2 className="mb-1.5 text-[15px] font-semibold text-muted">
-                {m.report.latest}
-              </h2>
-              {latest.length === 0 && (
-                <p className="text-muted">{m.report.noCheckIns}</p>
-              )}
-              <ol className="flex flex-col">
-                {latest.map((row) => (
-                  <li
-                    key={`${row.studentId}-${row.eventName}`}
-                    className="flex justify-between gap-4 border-b border-rule py-3 text-[15px] last:border-b-0"
-                  >
-                    <span className="flex min-w-0 flex-col">
-                      <span className="font-semibold">
-                        <bdi>{row.fullName}</bdi>
-                      </span>
-                      <span className="text-muted">
-                        {[row.studentId, row.eventName, row.checkedInByName]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-muted">
-                      {formatWhen(row.checkedInAt)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
             </section>
           )}
 
@@ -205,6 +274,7 @@ export function ReportPage() {
           </Button>
         </>
       )}
+      <Notice message={notice} onDone={() => setNotice(null)} />
     </Screen>
   );
 }

@@ -2,6 +2,7 @@ import { Router, type IRouter, type RequestHandler } from "express";
 import { createAuthRouter } from "./auth";
 import checkInsRouter from "./checkIns";
 import { createCardsRouter } from "./cards";
+import eventsRouter from "./events";
 import healthRouter from "./health";
 import rosterRouter from "./roster";
 import scansRouter from "./scans";
@@ -24,6 +25,7 @@ export function createRouter({
   router.use(rosterRouter);
   router.use(scansRouter);
   router.use(checkInsRouter);
+  router.use(eventsRouter);
   router.use(createCardsRouter(cardLimiter));
 
   return router;

@@ -6,7 +6,7 @@ general enough to reuse.
 
 - **Admins** scan at the door. It works with a weak or missing connection: scans
   are saved on the phone and sent when the signal returns.
-- **One super admin** also gets an attendance report with CSV export.
+- **Every admin** sees the attendance report (who has checked in and who has not, per event, searchable by part of an ID or a name) and can check someone in from it, and export the CSV. **The super admin** also opens and closes events in the app.
 - **Attendees** open a public page, type their student ID, and see their card
   (with the QR code, major when available) and which events they have attended.
 - **Everything else is SQL**: importing students, revoking and renewing,

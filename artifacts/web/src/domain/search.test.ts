@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foldName, searchStudents } from "./search";
+import { foldName, resolveTypedId, studentMatcher } from "./search";
 import { makeRoster } from "./testing";
 
 describe("foldName", () => {
@@ -22,69 +22,70 @@ describe("foldName spacing", () => {
   });
 });
 
-describe("searchStudents", () => {
-  const roster = makeRoster();
+const students = [
+  ...makeRoster().students,
+  { studentId: "S0000001234", fullName: "Nour Saleh", isActive: true },
+  { studentId: "S00000012345", fullName: "Omar Haddad", isActive: true },
+];
 
-  it("returns nothing for a blank query", () => {
-    expect(searchStudents(roster, "   ", 10)).toEqual({
-      matches: [],
-      total: 0,
-    });
+describe("studentMatcher", () => {
+  it("points at nobody for a blank query", () => {
+    expect(studentMatcher("   ")).toBeUndefined();
   });
 
-  it("matches part of a name, ignoring case", () => {
-    const { matches, total } = searchStudents(roster, "layla", 10);
-    expect(total).toBe(1);
-    expect(matches[0]?.student.studentId).toBe("1001");
-  });
-
-  it("matches part of an ID, also typed with Arabic digits", () => {
-    expect(
-      searchStudents(roster, "1002", 10).matches[0]?.student.fullName,
-    ).toBe("Yusuf Ibrahim");
-    expect(
-      searchStudents(roster, "١٠٠٢", 10).matches[0]?.student.studentId,
-    ).toBe("1002");
-    expect(searchStudents(roster, "100", 10).total).toBe(3);
-  });
-
-  it("shows each match's events in event order with their check-in state", () => {
-    const [layla] = searchStudents(roster, "layla", 10).matches;
-    expect(layla?.events.map((e) => [e.event.id, e.checkedInAt])).toEqual([
-      ["rehearsal", "2026-06-11T09:14:00.000Z"],
-      ["graduation", null],
+  it("finds part of an ID, in any letter case", () => {
+    const matches = studentMatcher("1234")!;
+    expect(students.filter(matches).map((s) => s.studentId)).toEqual([
+      "S0000001234",
+      "S00000012345",
     ]);
+    expect(students.filter(studentMatcher("s000000123")!)).toHaveLength(2);
   });
 
-  it("cuts to the limit but reports the full count", () => {
-    const result = searchStudents(roster, "100", 2);
-    expect(result.matches).toHaveLength(2);
-    expect(result.total).toBe(3);
+  it("reads Arabic digits and finds names despite spelling variants", () => {
+    expect(students.filter(studentMatcher("١٠٠٢")!)[0]?.studentId).toBe("1002");
+    expect(students.filter(studentMatcher("layla   hassan")!)).toHaveLength(1);
+    const arabic = [
+      { studentId: "9", fullName: "أحمد الفاطمي", isActive: true },
+    ];
+    expect(arabic.filter(studentMatcher("احمد")!)).toHaveLength(1);
   });
+});
 
-  it("finds Arabic names however they are spelled", () => {
-    const arabic = makeRoster({
-      students: [
-        { studentId: "2001", fullName: "أحمد الفاطمي", isActive: true },
-      ],
-      registrations: [],
+describe("resolveTypedId", () => {
+  it("takes a whole ID as it is, in any letter case, even when a longer one contains it", () => {
+    expect(resolveTypedId(students, "S0000001234", 8)).toEqual({
+      kind: "exact",
+      studentId: "S0000001234",
     });
-    expect(searchStudents(arabic, "احمد", 10).total).toBe(1);
-  });
-
-  it("finds an ID whatever its letter case", () => {
-    const lettered = makeRoster({
-      students: [
-        { studentId: "CS/2021/045", fullName: "Nour Saleh", isActive: true },
-      ],
-      registrations: [],
+    expect(resolveTypedId(students, " s0000001234 ", 8)).toEqual({
+      kind: "exact",
+      studentId: "S0000001234",
     });
-    expect(searchStudents(lettered, "cs/2021", 10).total).toBe(1);
-    expect(searchStudents(lettered, "CS/2021/045", 10).total).toBe(1);
   });
 
-  it("finds a name typed with different spacing", () => {
-    expect(searchStudents(roster, "layla   hassan", 10).total).toBe(1);
-    expect(searchStudents(roster, " layla hassan ", 10).total).toBe(1);
+  it("offers a choice for part of an ID instead of guessing", () => {
+    const result = resolveTypedId(students, "1234", 8);
+    expect(result.kind).toBe("choose");
+    if (result.kind === "choose") {
+      expect(result.candidates.map((s) => s.studentId)).toEqual([
+        "S0000001234",
+        "S00000012345",
+      ]);
+      expect(result.total).toBe(2);
+    }
+  });
+
+  it("offers a choice even for a single partial match, and cuts a long list", () => {
+    const one = resolveTypedId(students, "003", 8);
+    expect(one).toMatchObject({ kind: "choose", total: 1 });
+    const many = resolveTypedId(students, "10", 2);
+    expect(many).toMatchObject({ kind: "choose", total: 3 });
+    if (many.kind === "choose") expect(many.candidates).toHaveLength(2);
+  });
+
+  it("says none when nobody matches or nothing was typed", () => {
+    expect(resolveTypedId(students, "99999", 8)).toEqual({ kind: "none" });
+    expect(resolveTypedId(students, "   ", 8)).toEqual({ kind: "none" });
   });
 });

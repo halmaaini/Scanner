@@ -25,9 +25,8 @@ export const QUERY_RETRIES = 1;
 /** A student's card is re-read after this long when the page is reopened or refocused. */
 export const CARD_STALE_MS = 30_000;
 
-/** The report shows this many latest check-ins, and this many search matches. */
-export const REPORT_LATEST_LIMIT = 20;
-export const REPORT_SEARCH_LIMIT = 25;
+/** Most students offered to choose from when an ID typed at the scanner is only part of one. */
+export const TYPED_ID_CHOICES = 8;
 
 /** How often an open screen re-reads the roster (only while visible and online). */
 export const ROSTER_POLL_MS = 30_000;

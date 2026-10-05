@@ -46,21 +46,19 @@ test.describe("signing in", () => {
     await expect(page).toHaveURL(/\/card$/);
   });
 
-  test("keeps admins out of the report but lets the super admin in", async ({
+  test("keeps admins out of the events page but lets the super admin in", async ({
     page,
   }) => {
     await signIn(page, "omar");
-    await expect(page.getByRole("link", { name: "Report" })).toHaveCount(0);
-    await page.goto("/report");
+    await expect(page.getByRole("link", { name: "Events" })).toHaveCount(0);
+    await page.goto("/events");
     await expect(page).toHaveURL(/\/scan$/);
     await page.getByRole("button", { name: "Sign out" }).click();
 
     await signIn(page, "boss");
     await expect(page.getByText("Hala (super admin)")).toBeVisible();
-    await page.getByRole("link", { name: "Report" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Attendance" }),
-    ).toBeVisible();
+    await page.getByRole("link", { name: "Events" }).click();
+    await expect(page.getByRole("heading", { name: "Events" })).toBeVisible();
   });
 
   test("wipes what the phone saved when signing out: no student list, no unsent changes", async ({

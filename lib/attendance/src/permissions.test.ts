@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { can, canUndoCheckIn } from "./permissions";
 
 describe("can", () => {
-  it("gives the super admin the report and undo-any", () => {
+  it("lets every staff member see the report", () => {
+    expect(can("admin", "view_report")).toBe(true);
     expect(can("super", "view_report")).toBe(true);
-    expect(can("super", "undo_any_check_in")).toBe(true);
   });
 
-  it("keeps both away from plain admins", () => {
-    expect(can("admin", "view_report")).toBe(false);
+  it("gives the super admin the events and undo-any, and keeps both from admins", () => {
+    expect(can("super", "manage_events")).toBe(true);
+    expect(can("super", "undo_any_check_in")).toBe(true);
+    expect(can("admin", "manage_events")).toBe(false);
     expect(can("admin", "undo_any_check_in")).toBe(false);
   });
 });

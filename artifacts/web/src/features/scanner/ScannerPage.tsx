@@ -5,8 +5,10 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/Button";
 import { buttonStyles } from "@/components/buttonStyles";
 import { Screen } from "@/components/Screen";
-import { indexRoster } from "@/domain/roster";
+import { indexRoster, type Student } from "@/domain/roster";
+import { resolveTypedId } from "@/domain/search";
 import { summarizeEvents, summaryFor } from "@/domain/summary";
+import { TYPED_ID_CHOICES } from "@/config";
 import { useCurrentStaff } from "@/features/auth/StaffContext";
 import { signOut } from "@/features/auth/signOut";
 import { BUZZ_ATTENTION, BUZZ_OK, buzz } from "@/lib/haptics";
@@ -21,6 +23,7 @@ import { ManualEntry } from "./ManualEntry";
 import { Notice } from "./Notice";
 import { QrCamera } from "./QrCamera";
 import { ResultView } from "./ResultView";
+import { StudentChoices } from "./StudentChoices";
 import { SyncStatus } from "./SyncStatus";
 import { useSelectedEvent } from "./useSelectedEvent";
 
@@ -50,6 +53,11 @@ export function ScannerPage() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [checking, setChecking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // An ID typed in part matched these students: the person picks one.
+  const [choices, setChoices] = useState<{
+    candidates: Student[];
+    total: number;
+  } | null>(null);
   // What the result screen shows now, for work that finishes after it has closed.
   const shownAnswer = useRef<Answer | null>(null);
   useEffect(() => {
@@ -64,12 +72,22 @@ export function ScannerPage() {
   const scan = useCallback(
     async (raw: string, source: "camera" | "typed") => {
       if (busy.current || !eventId) return;
+      let id = raw;
+      if (source === "typed" && view) {
+        const typed = resolveTypedId(view.students, raw, TYPED_ID_CHOICES);
+        if (typed.kind === "choose") {
+          setChoices({ candidates: typed.candidates, total: typed.total });
+          return;
+        }
+        if (typed.kind === "exact") id = typed.studentId;
+      }
+      setChoices(null);
       busy.current = true;
       setChecking(true);
       returnToField.current = source === "typed";
       try {
         const response = await scanning.scan({
-          raw,
+          raw: id,
           eventId,
           staffId: staff.id,
           view,
@@ -171,6 +189,11 @@ export function ScannerPage() {
             </span>
           </div>
           <nav className="flex shrink-0 items-center gap-4">
+            {can(staff.role, "manage_events") && (
+              <Link href="/events" className={buttonStyles.link}>
+                {m.scanner.events}
+              </Link>
+            )}
             {can(staff.role, "view_report") && (
               <Link href="/report" className={buttonStyles.link}>
                 {m.scanner.report}
@@ -271,6 +294,15 @@ export function ScannerPage() {
               disabled={answer !== null || checking}
               checking={checking}
             />
+
+            {choices && (
+              <StudentChoices
+                candidates={choices.candidates}
+                total={choices.total}
+                onPick={(studentId) => void scan(studentId, "typed")}
+                onCancel={() => setChoices(null)}
+              />
+            )}
           </>
         )}
 

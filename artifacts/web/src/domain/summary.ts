@@ -40,38 +40,3 @@ export function summaryFor(
 ): EventSummary | undefined {
   return summaries.find((s) => s.event.id === eventId);
 }
-
-export interface CheckInRow {
-  studentId: string;
-  fullName: string;
-  eventName: string;
-  checkedInAt: string;
-  /** Null if the staff member is not in the roster (never expected). */
-  checkedInByName: string | null;
-}
-
-/** The most recent check-ins across all events, newest first. */
-export function latestCheckIns(roster: Roster, limit: number): CheckInRow[] {
-  const index = indexRoster(roster);
-  const rows: CheckInRow[] = [];
-
-  for (const r of roster.registrations) {
-    if (!r.checkedInAt) continue;
-    const student = index.studentById.get(r.studentId);
-    const event = index.eventById.get(r.eventId);
-    if (!student || !event) continue;
-    rows.push({
-      studentId: student.studentId,
-      fullName: student.fullName,
-      eventName: event.name,
-      checkedInAt: r.checkedInAt,
-      checkedInByName:
-        r.checkedInBy === null
-          ? null
-          : (index.staffById.get(r.checkedInBy)?.displayName ?? null),
-    });
-  }
-
-  rows.sort((a, b) => Date.parse(b.checkedInAt) - Date.parse(a.checkedInAt));
-  return rows.slice(0, limit);
-}

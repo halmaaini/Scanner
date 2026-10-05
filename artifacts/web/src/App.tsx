@@ -8,6 +8,7 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { RequireStaff } from "@/features/auth/StaffContext";
 import { useStaff } from "@/features/auth/useStaff";
 import { NotFoundPage } from "@/features/NotFoundPage";
+import { EventsPage } from "@/features/events/EventsPage";
 import { ReportPage } from "@/features/report/ReportPage";
 import { ScannerPage } from "@/features/scanner/ScannerPage";
 
@@ -39,6 +40,11 @@ export function App() {
           <Route path="/report">
             <RequireStaff permission="view_report">
               <ReportPage />
+            </RequireStaff>
+          </Route>
+          <Route path="/events">
+            <RequireStaff permission="manage_events">
+              <EventsPage />
             </RequireStaff>
           </Route>
           <Route path="/card" component={LookupPage} />

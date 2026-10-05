@@ -18,12 +18,32 @@ describe("buildAttendanceCsv", () => {
   it("exports majors and keeps spreadsheet formulas in majors inert", () => {
     const roster = makeRoster({
       students: [
-        { studentId: "1", fullName: "Layla", major: "Engineering", isActive: true },
-        { studentId: "2", fullName: "Nour", major: '=HYPERLINK("http://x")', isActive: true },
+        {
+          studentId: "1",
+          fullName: "Layla",
+          major: "Engineering",
+          isActive: true,
+        },
+        {
+          studentId: "2",
+          fullName: "Nour",
+          major: '=HYPERLINK("http://x")',
+          isActive: true,
+        },
       ],
       registrations: [
-        { studentId: "1", eventId: "graduation", checkedInAt: null, checkedInBy: null },
-        { studentId: "2", eventId: "graduation", checkedInAt: null, checkedInBy: null },
+        {
+          studentId: "1",
+          eventId: "graduation",
+          checkedInAt: null,
+          checkedInBy: null,
+        },
+        {
+          studentId: "2",
+          eventId: "graduation",
+          checkedInAt: null,
+          checkedInBy: null,
+        },
       ],
     });
     const csv = buildAttendanceCsv(roster);

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { expect, signIn, test } from "../support";
+import { expect, registrationOf, signIn, test } from "../support";
 
-test.describe("the super admin's report", () => {
+test.describe("the report", () => {
   test.beforeEach(async ({ page }) => {
     await signIn(page, "boss");
     await page.getByRole("link", { name: "Report" }).click();
@@ -10,31 +10,49 @@ test.describe("the super admin's report", () => {
     ).toBeVisible();
   });
 
-  test("shows progress per event and the latest check-ins", async ({
-    page,
-  }) => {
+  test("shows progress per event", async ({ page }) => {
     const rehearsal = page.getByRole("progressbar", { name: "Rehearsal" });
     await expect(rehearsal).toHaveAttribute("aria-valuenow", "5");
     await expect(rehearsal).toHaveAttribute("aria-valuemax", "9");
     await expect(page.getByText("5 / 9")).toBeVisible();
     await expect(page.getByText("0 / 9")).toBeVisible();
     await expect(page.getByText("0 / 3")).toBeVisible();
-
-    const latest = page.getByRole("list").filter({ hasText: "Layla Hassan" });
-    await expect(latest.getByRole("listitem")).toHaveCount(5);
-    await expect(latest).toContainText("1001 · Rehearsal · Sara");
   });
 
-  test("finds a student by name, ID or Arabic spelling and shows each event", async ({
+  test("lists everyone on an event, with a filter for who has checked in", async ({
+    page,
+  }) => {
+    const row = (name: string) =>
+      page.getByRole("listitem").filter({ hasText: name });
+
+    // Rehearsal is first: five of the ten are in, one is revoked and not in.
+    await expect(row("Layla Hassan")).toContainText("Checked in");
+    await expect(row("Layla Hassan")).toContainText("by Sara");
+    await expect(row("Omar Haddad")).toContainText("Not yet");
+    await expect(page.getByText("10 students")).toBeVisible();
+
+    await page.getByRole("button", { name: "Not yet" }).click();
+    await expect(row("Layla Hassan")).toHaveCount(0);
+    await expect(row("Omar Haddad")).toBeVisible();
+    await expect(page.getByText("5 students")).toBeVisible();
+
+    await page.getByRole("button", { name: "Checked in" }).click();
+    await expect(row("Layla Hassan")).toBeVisible();
+    await expect(row("Omar Haddad")).toHaveCount(0);
+  });
+
+  test("finds a student by part of the ID or the name, and by Arabic spelling", async ({
     page,
   }) => {
     const box = page.getByLabel("Find a student");
 
     await box.fill("layla");
-    const row = page.getByRole("listitem").filter({ hasText: "Layla Hassan" });
-    await expect(row).toContainText("Rehearsal:");
-    await expect(row).toContainText("Graduation ceremony: Not yet");
-    await expect(row).toContainText("Trophy handover: Not yet");
+    await expect(page.getByText("1 student", { exact: true })).toBeVisible();
+
+    await box.fill("007");
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "Omar Haddad" }),
+    ).toBeVisible();
 
     await box.fill("1003");
     await expect(
@@ -47,6 +65,18 @@ test.describe("the super admin's report", () => {
 
     await box.fill("zzzz");
     await expect(page.getByText("No students match.")).toBeVisible();
+  });
+
+  test("checks a student in from the list", async ({ page }) => {
+    await page.getByLabel("Find a student").fill("1007");
+    await page.getByRole("button", { name: "Check in Omar Haddad" }).click();
+
+    const row = page.getByRole("listitem").filter({ hasText: "Omar Haddad" });
+    await expect(row).toContainText("Checked in");
+    await expect(row).toContainText("by Hala");
+    expect(await registrationOf("1007", "rehearsal")).toMatchObject({
+      by: "Hala",
+    });
   });
 
   test("exports a CSV that opens correctly in a spreadsheet", async ({
@@ -74,5 +104,16 @@ test.describe("the super admin's report", () => {
     expect(text).toContain("أحمد الفاطمي");
     // Nine students on two events plus three on the trophy list, and the revoked one on two.
     expect(text.trim().split("\r\n")).toHaveLength(1 + 10 * 2 + 3);
+  });
+});
+
+test.describe("an admin", () => {
+  test("can open the report too", async ({ page }) => {
+    await signIn(page, "omar");
+    await page.getByRole("link", { name: "Report" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Attendance" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Events" })).toHaveCount(0);
   });
 });

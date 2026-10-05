@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latestCheckIns, summarizeEvents, summaryFor } from "./summary";
+import { summarizeEvents, summaryFor } from "./summary";
 import { makeRoster, reg } from "./testing";
 
 describe("summarizeEvents", () => {
@@ -37,53 +37,5 @@ describe("summarizeEvents", () => {
     const summaries = summarizeEvents(makeRoster());
     expect(summaryFor(summaries, "graduation")?.event.name).toBe("Graduation");
     expect(summaryFor(summaries, undefined)).toBeUndefined();
-  });
-});
-
-describe("latestCheckIns", () => {
-  it("lists check-ins newest first with student, event and who scanned", () => {
-    const roster = makeRoster({
-      registrations: [
-        ...makeRoster().registrations,
-        reg("1002", "rehearsal", "2026-06-11T10:00:00.000Z", 3),
-      ].filter(
-        (r) =>
-          !(
-            r.studentId === "1002" &&
-            r.eventId === "rehearsal" &&
-            !r.checkedInAt
-          ),
-      ),
-    });
-    expect(latestCheckIns(roster, 10)).toEqual([
-      {
-        studentId: "1003",
-        fullName: "Karim Nasser",
-        eventName: "Graduation",
-        checkedInAt: "2026-06-12T09:00:00.000Z",
-        checkedInByName: "Omar",
-      },
-      {
-        studentId: "1002",
-        fullName: "Yusuf Ibrahim",
-        eventName: "Rehearsal",
-        checkedInAt: "2026-06-11T10:00:00.000Z",
-        checkedInByName: "Omar",
-      },
-      {
-        studentId: "1001",
-        fullName: "Layla Hassan",
-        eventName: "Rehearsal",
-        checkedInAt: "2026-06-11T09:14:00.000Z",
-        checkedInByName: "Sara",
-      },
-    ]);
-  });
-
-  it("respects the limit and copes with an unknown staff id", () => {
-    const roster = makeRoster({ staff: [] });
-    const rows = latestCheckIns(roster, 1);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.checkedInByName).toBeNull();
   });
 });

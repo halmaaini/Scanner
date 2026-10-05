@@ -23,6 +23,8 @@ tags:
     description: Submitting scans (online or replayed after being offline)
   - name: check-ins
     description: Correcting check-ins
+  - name: events
+    description: Opening and closing events
   - name: cards
     description: Public attendee cards
 paths:
@@ -176,6 +178,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Registration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /events/{eventId}:
+    patch:
+      operationId: setEventOpen
+      tags: [events]
+      summary: Open or close an event
+      description: >
+        Super admin only. Scanners only offer open events; closing one hides
+        it from them but deletes nothing, and scans made offline before it
+        closed are still accepted. Setting the state an event already has
+        succeeds and changes nothing.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/EventIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventOpenChange"
+      responses:
+        "200":
+          description: The event after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -344,6 +381,13 @@ components:
         isOpen:
           type: boolean
           description: Scanners only offer open events.
+    EventOpenChange:
+      type: object
+      required: [isOpen]
+      additionalProperties: false
+      properties:
+        isOpen:
+          type: boolean
     Student:
       type: object
       required: [studentId, fullName, isActive]

@@ -1,5 +1,5 @@
 import { normalizeStudentId } from "@workspace/attendance";
-import type { Event, Roster, Student } from "./roster";
+import type { Student } from "./roster";
 
 /**
  * Makes names comparable for searching: case, accents, runs of spaces and
@@ -17,56 +17,56 @@ export function foldName(text: string): string {
     .replace(/\u0649/g, "\u064a");
 }
 
-export interface StudentAttendance {
-  student: Student;
-  /** One entry per event the student is registered for, in event order. */
-  events: { event: Event; checkedInAt: string | null }[];
-}
-
-export interface SearchResult {
-  matches: StudentAttendance[];
-  /** How many students matched in all (matches may be cut to `limit`). */
-  total: number;
-}
-
-/** Students whose ID contains the query or whose name contains it (spelling-tolerant). */
-export function searchStudents(
-  roster: Roster,
+/**
+ * Whether what a person typed points at this student: part of the ID in any
+ * letter case ("1234" finds "S0000001234"), or part of the name (spelling
+ * tolerant). Undefined for a blank query, which points at nobody.
+ */
+export function studentMatcher(
   query: string,
-  limit: number,
-): SearchResult {
+): ((student: Student) => boolean) | undefined {
   const trimmed = query.trim();
-  if (!trimmed) return { matches: [], total: 0 };
+  if (!trimmed) return undefined;
 
   const idQuery = normalizeStudentId(trimmed).toLowerCase();
   const nameQuery = foldName(trimmed);
+  return (student) =>
+    (idQuery !== "" && student.studentId.toLowerCase().includes(idQuery)) ||
+    foldName(student.fullName).includes(nameQuery);
+}
 
-  const found = roster.students.filter(
-    (s) =>
-      (idQuery !== "" && s.studentId.toLowerCase().includes(idQuery)) ||
-      foldName(s.fullName).includes(nameQuery),
-  );
-  const shown = new Set(found.slice(0, limit).map((s) => s.studentId));
+/** What typing something at the scanner leads to. */
+export type TypedId =
+  /** The ID of exactly one student: scan it. */
+  | { kind: "exact"; studentId: string }
+  /** Several or inexact matches: let the person choose, never guess. */
+  | { kind: "choose"; candidates: Student[]; total: number }
+  /** Nobody matches: scan it as typed and let the answer say so. */
+  | { kind: "none" };
 
-  const eventOrder = new Map(roster.events.map((e, i) => [e.id, i]));
-  const eventById = new Map(roster.events.map((e) => [e.id, e]));
-  const perStudent = new Map<string, StudentAttendance["events"]>();
-  for (const r of roster.registrations) {
-    const event = eventById.get(r.eventId);
-    if (!event || !shown.has(r.studentId)) continue;
-    const list = perStudent.get(r.studentId) ?? [];
-    list.push({ event, checkedInAt: r.checkedInAt });
-    perStudent.set(r.studentId, list);
-  }
+/**
+ * An ID typed in full (any letter case) is taken as it is, even when longer
+ * IDs contain it; anything else is matched loosely and offered as a choice.
+ */
+export function resolveTypedId(
+  students: readonly Student[],
+  raw: string,
+  limit: number,
+): TypedId {
+  const id = normalizeStudentId(raw);
+  if (!id) return { kind: "none" };
 
+  const exact =
+    students.find((s) => s.studentId === id) ??
+    students.find((s) => s.studentId.toLowerCase() === id.toLowerCase());
+  if (exact) return { kind: "exact", studentId: exact.studentId };
+
+  const matches = studentMatcher(raw);
+  const found = matches ? students.filter(matches) : [];
+  if (found.length === 0) return { kind: "none" };
   return {
+    kind: "choose",
+    candidates: found.slice(0, limit),
     total: found.length,
-    matches: found.slice(0, limit).map((student) => ({
-      student,
-      events: (perStudent.get(student.studentId) ?? []).sort(
-        (a, b) =>
-          (eventOrder.get(a.event.id) ?? 0) - (eventOrder.get(b.event.id) ?? 0),
-      ),
-    })),
   };
 }

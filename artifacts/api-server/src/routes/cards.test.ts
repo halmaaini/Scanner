@@ -28,6 +28,7 @@ describeWithDb("cards", () => {
     expect(res.body).toEqual({
       studentId: "1001",
       fullName: "Layla Hassan",
+      major: null,
       isActive: true,
       events: [
         {

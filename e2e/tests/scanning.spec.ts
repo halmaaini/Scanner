@@ -169,4 +169,21 @@ test.describe("scanning by typing an ID", () => {
       page.getByRole("dialog").getByText("Omar", { exact: true }),
     ).toBeVisible();
   });
+
+  test("offers a choice for part of an ID instead of guessing", async ({
+    page,
+  }) => {
+    await page.getByLabel("Student ID").fill("007");
+    await page.getByRole("button", { name: "Check in" }).click();
+
+    // Nothing is checked in yet: the person picks the student.
+    await expect(page.getByText("Which student?")).toBeVisible();
+    expect((await registrationOf("1007", "rehearsal"))?.checkedInAt).toBeNull();
+    await page.getByRole("button", { name: /Omar Haddad/ }).click();
+
+    await expect(
+      page.getByRole("dialog").getByRole("heading", { name: "Checked in" }),
+    ).toBeVisible();
+    expect((await registrationOf("1007", "rehearsal"))?.by).toBe("Sara");
+  });
 });

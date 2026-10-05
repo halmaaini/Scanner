@@ -55,6 +55,7 @@ describeWithDb("scans", () => {
         student: {
           studentId: "1001",
           fullName: "Layla Hassan",
+          major: null,
           isActive: true,
         },
         registration: {
@@ -122,6 +123,7 @@ describeWithDb("scans", () => {
     expect(res.body.results[3].student).toEqual({
       studentId: "1002",
       fullName: "Karim",
+      major: null,
       isActive: false,
     });
     // Nothing was recorded.

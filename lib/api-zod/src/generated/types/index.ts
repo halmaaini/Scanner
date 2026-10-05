@@ -12,6 +12,7 @@ export * from './card';
 export * from './cardEvent';
 export * from './errorBody';
 export * from './event';
+export * from './eventOpenChange';
 export * from './forbiddenResponse';
 export * from './healthStatus';
 export * from './loginInput';

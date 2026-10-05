@@ -77,6 +77,7 @@ export const m = {
     signedInAs: "Signed in as",
     roles: { admin: "admin", super: "super admin" },
     report: "Report",
+    events: "Events",
     event: "Event",
     title: "Scanner",
     /** Shown after the (large) number already checked in. */
@@ -94,6 +95,12 @@ export const m = {
       `“${was}” is no longer open. Now scanning for “${now}”.`,
     cameraError: "The camera could not start. Type the student ID below.",
     orType: "or type the student ID",
+    choose: {
+      title: "Which student?",
+      more: (n: number) =>
+        `…and ${n} more. Type more of the ID to narrow it down.`,
+      cancel: "Cancel",
+    },
     studentId: "Student ID",
     checkIn: "Check in",
     noOpenEvents: {
@@ -186,24 +193,44 @@ export const m = {
   },
 
   report: {
-    role: "Super admin",
     major: "Major",
     title: "Attendance",
     scanner: "Scanner",
+    events: "Events",
     loading: "Loading the report…",
     failed: "Couldn't load the report.",
     noEvents: "No events yet.",
     progress: (checkedIn: number, expected: number) =>
       `${checkedIn} / ${expected}`,
+    attendees: "Attendees",
+    event: "Event",
     findStudent: "Find a student",
-    findPlaceholder: "Name or student ID",
-    latest: "Latest check-ins",
-    noCheckIns: "No check-ins yet.",
+    findPlaceholder: "Name or part of the student ID",
+    filter: "Show",
+    filters: { all: "All", in: "Checked in", out: "Not yet" },
+    shown: (n: number) => `${n} ${plural(n, "student", "students")}`,
     noMatches: "No students match.",
-    firstMatches: (n: number) => `Showing the first ${n} matches.`,
     notYet: "Not yet",
+    checkedInAt: (when: string, by: string | null) =>
+      by ? `Checked in ${when} by ${by}` : `Checked in ${when}`,
+    checkInStudent: (name: string) => `Check in ${name}`,
+    checkIn: "Check in",
     revoked: "Access revoked",
     exportCsv: "Export CSV",
+  },
+
+  events: {
+    title: "Events",
+    intro:
+      "Scanners only offer open events. Closing one hides it from them and deletes nothing.",
+    open: "Open",
+    closed: "Closed",
+    toggle: (name: string) => `${name}: open for scanning`,
+    none: "No events yet.",
+    needsConnection:
+      "Couldn't change the event. This needs a connection: check it and try again.",
+    report: "Report",
+    scanner: "Scanner",
   },
 
   lookup: {

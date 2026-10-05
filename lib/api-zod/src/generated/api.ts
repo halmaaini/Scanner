@@ -161,6 +161,30 @@ export const UndoCheckInResponse = zod.object({
 
 
 /**
+ * Super admin only. Scanners only offer open events; closing one hides it from them but deletes nothing, and scans made offline before it closed are still accepted. Setting the state an event already has succeeds and changes nothing.
+ * @summary Open or close an event
+ */
+export const setEventOpenPathEventIdMax = 64;
+
+
+
+export const SetEventOpenParams = zod.object({
+  "eventId": zod.coerce.string().min(1).max(setEventOpenPathEventIdMax).describe('Event id (a short slug such as `graduation`).')
+})
+
+export const SetEventOpenBody = zod.object({
+  "isOpen": zod.boolean()
+})
+
+export const SetEventOpenResponse = zod.object({
+  "id": zod.string().describe('Short slug, e.g. `rehearsal`.'),
+  "name": zod.string(),
+  "sortOrder": zod.int(),
+  "isOpen": zod.boolean().describe('Scanners only offer open events.')
+})
+
+
+/**
  * Public. Returns a student's name and, for each event they are registered for, whether they have checked in. The student ID is the only key, by design; requests are rate limited per client.
  * @summary Attendee card
  */

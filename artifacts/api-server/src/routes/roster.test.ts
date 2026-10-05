@@ -53,9 +53,24 @@ describeWithDb("roster", () => {
         { id: "graduation", name: "Graduation", sortOrder: 2, isOpen: true },
       ],
       students: [
-        { studentId: "1001", fullName: "Layla Hassan", isActive: true },
-        { studentId: "1002", fullName: "Yusuf Ibrahim", isActive: true },
-        { studentId: "1003", fullName: "Karim Nasser", isActive: false },
+        {
+          studentId: "1001",
+          fullName: "Layla Hassan",
+          major: null,
+          isActive: true,
+        },
+        {
+          studentId: "1002",
+          fullName: "Yusuf Ibrahim",
+          major: null,
+          isActive: true,
+        },
+        {
+          studentId: "1003",
+          fullName: "Karim Nasser",
+          major: null,
+          isActive: false,
+        },
       ],
       registrations: [
         {

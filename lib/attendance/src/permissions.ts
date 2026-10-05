@@ -5,11 +5,15 @@ import type { StaffRole } from "@workspace/api-zod";
  * signed-in staff member can scan. Adding a role to the API spec makes this
  * file fail to compile until the new role is listed here.
  */
-export type Permission = "view_report" | "undo_any_check_in";
+export type Permission = "view_report" | "manage_events" | "undo_any_check_in";
 
 const GRANTS: Record<StaffRole, ReadonlySet<Permission>> = {
-  admin: new Set(),
-  super: new Set<Permission>(["view_report", "undo_any_check_in"]),
+  admin: new Set<Permission>(["view_report"]),
+  super: new Set<Permission>([
+    "view_report",
+    "manage_events",
+    "undo_any_check_in",
+  ]),
 };
 
 export function can(role: StaffRole, permission: Permission): boolean {
