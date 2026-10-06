@@ -127,4 +127,26 @@ test.describe("the student's card", () => {
       page.getByRole("img", { name: "QR code for student 1001" }),
     ).toBeVisible();
   });
+
+  test("shows the seat in words and on the hall plan", async ({ page }) => {
+    await page.goto("/card/1001");
+    await expect(
+      page.getByRole("heading", { name: "Your seat" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "You are on the Stage Right side, seat 7 of 9 in the row.",
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Your seat in the hall" }),
+    ).toBeVisible();
+  });
+
+  test("says when the seat has not been assigned yet", async ({ page }) => {
+    await page.goto("/card/1009");
+    await expect(
+      page.getByText("Your seat has not been assigned yet."),
+    ).toBeVisible();
+  });
 });

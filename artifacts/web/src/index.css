@@ -28,6 +28,13 @@
   --color-bad: #9b1c1c;
   --color-bad-soft: #fbdada;
   --color-warn-soft: #fbe9d0;
+
+  /* The hall plan: seats, the optional extra rows, and the pool. */
+  --color-seat: #dbe7f3;
+  --color-seat-ink: #2c3e5c;
+  --color-extra: #f8dfcc;
+  --color-water: #b9d6e6;
+  --color-water-ink: #2f5d78;
 }
 
 @layer base {
@@ -80,5 +87,28 @@
   .scan-line {
     animation: none;
     top: 50%;
+  }
+}
+
+/* The student's own seat on the hall plan pulses so the eye finds it. */
+@keyframes hall-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.hall-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hall-pulse 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hall-pulse {
+    animation: none;
+    opacity: 0.6;
   }
 }

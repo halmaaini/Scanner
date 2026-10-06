@@ -6,12 +6,12 @@ describe("buildAttendanceCsv", () => {
   it("writes one row per registration with attendance, time, scanner and access", () => {
     const lines = buildAttendanceCsv(makeRoster()).trimEnd().split("\r\n");
     expect(lines).toEqual([
-      "student_id,name,major,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access",
-      "1001,Layla Hassan,,Rehearsal,yes,2026-06-11 09:14:00,2026-06-11T09:14:00.000Z,Sara,active",
-      "1002,Yusuf Ibrahim,,Rehearsal,no,,,,active",
-      "1001,Layla Hassan,,Graduation,no,,,,active",
-      "1002,Yusuf Ibrahim,,Graduation,no,,,,active",
-      "1003,Karim Nasser,,Graduation,yes,2026-06-12 09:00:00,2026-06-12T09:00:00.000Z,Omar,revoked",
+      "student_id,name,major,seat,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access",
+      "1001,Layla Hassan,,,Rehearsal,yes,2026-06-11 09:14:00,2026-06-11T09:14:00.000Z,Sara,active",
+      "1002,Yusuf Ibrahim,,,Rehearsal,no,,,,active",
+      "1001,Layla Hassan,,,Graduation,no,,,,active",
+      "1002,Yusuf Ibrahim,,,Graduation,no,,,,active",
+      "1003,Karim Nasser,,,Graduation,yes,2026-06-12 09:00:00,2026-06-12T09:00:00.000Z,Omar,revoked",
     ]);
   });
 
@@ -47,7 +47,7 @@ describe("buildAttendanceCsv", () => {
       ],
     });
     const csv = buildAttendanceCsv(roster);
-    expect(csv).toContain("1,Layla,Engineering,Graduation");
+    expect(csv).toContain("1,Layla,Engineering,,Graduation");
     expect(csv).toContain("'=HYPERLINK");
   });
 
@@ -83,5 +83,17 @@ describe("buildAttendanceCsv", () => {
       ],
     });
     expect(buildAttendanceCsv(roster)).toContain("'=HYPERLINK");
+  });
+
+  it("exports the seat as a row letter and number", () => {
+    const roster = makeRoster();
+    roster.students[0] = {
+      ...roster.students[0]!,
+      seatRow: "F",
+      seatNumber: 7,
+    };
+    const lines = buildAttendanceCsv(roster).trimEnd().split("\r\n");
+    expect(lines[1]).toMatch(/^1001,Layla Hassan,,F7,Rehearsal,/);
+    expect(lines[2]).toMatch(/^1002,Yusuf Ibrahim,,,Rehearsal,/);
   });
 });

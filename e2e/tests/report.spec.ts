@@ -109,13 +109,13 @@ test.describe("the report", () => {
     const text = readFileSync((await download.path())!, "utf8");
     expect(
       text.startsWith(
-        "\ufeffstudent_id,name,major,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access\r\n",
+        "\ufeffstudent_id,name,major,seat,event,attended,checked_in_at,checked_in_at_utc,checked_in_by,access\r\n",
       ),
     ).toBe(true);
-    expect(text).toContain("1001,Layla Hassan,,Rehearsal,yes,");
+    expect(text).toContain("1001,Layla Hassan,,F7,Rehearsal,yes,");
     expect(text).toContain(",Sara,active");
     expect(text).toContain(
-      "1003,Karim Nasser,,Graduation ceremony,no,,,,revoked",
+      "1003,Karim Nasser,,K3,Graduation ceremony,no,,,,revoked",
     );
     expect(text).toContain("أحمد الفاطمي");
     // Nine students on two events plus three on the trophy list, and the revoked one on two.
@@ -138,6 +138,45 @@ test.describe("the report", () => {
     expect(
       await sql("select note from students where student_id = '1007'"),
     ).toEqual([{ note: null }]);
+  });
+
+  test("shows the hall with who is in, and a touched seat opens the student", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: "Seats", exact: true }).click();
+    await expect(page.getByText("5 seated, 2 still to come")).toBeVisible();
+
+    // A seat can be reached by keyboard; a tap on the plan itself zooms in first.
+    const seat = page.getByRole("button", { name: "Row E, seat 8" });
+    await seat.focus();
+    await page.keyboard.press("Enter");
+
+    const sheet = page.getByRole("dialog", { name: "Omar Haddad" });
+    await expect(sheet).toContainText("Row E, seat 8, Stage Right");
+    await expect(sheet).toContainText("Not yet checked in");
+
+    await sheet.getByRole("button", { name: "Check in" }).click();
+    await expect(page.getByText("6 seated, 1 still to come")).toBeVisible();
+    await expect(sheet).toContainText("Checked in");
+  });
+
+  test("zooms in on a tap and lists students who have no seat", async ({
+    page,
+  }) => {
+    await sql(
+      "update students set seat_row = null, seat_number = null where student_id = '1007'",
+    );
+    await page.reload();
+    await page.getByRole("button", { name: "Seats", exact: true }).click();
+    await page.getByText("3 students have no seat yet").click();
+    await expect(page.getByText("Omar Haddad")).toBeVisible();
+
+    const zoomIn = page.getByRole("button", { name: "Zoom in" });
+    await zoomIn.click();
+    await zoomIn.click();
+    await expect(
+      page.getByText("Tap the plan to zoom in, then tap a seat."),
+    ).toHaveCount(0);
   });
 });
 

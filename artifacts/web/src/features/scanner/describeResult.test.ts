@@ -125,4 +125,19 @@ describe("describeResult", () => {
     ).toBe(m.results.offline.checkedAgainstList);
     expect(describeIt(result({}), false).offlineNote).toBeUndefined();
   });
+
+  it("tells the staff member where the student sits", () => {
+    const d = describeIt(
+      result({ student: { ...student, seatRow: "F", seatNumber: 7 } }),
+    );
+    expect(d.rows.find((r) => r.label === "Seat")?.value).toBe(
+      "F7, Stage Right",
+    );
+  });
+
+  it("shows no seat line when none is assigned", () => {
+    expect(describeIt(result({})).rows.map((r) => r.label)).not.toContain(
+      "Seat",
+    );
+  });
 });

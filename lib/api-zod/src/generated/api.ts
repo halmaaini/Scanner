@@ -84,13 +84,16 @@ export const GetRosterResponse = zod.object({
   "isOpen": zod.boolean().describe('Scanners only offer open events.'),
   "startsAt": zod.iso.datetime({"offset":true}).nullish().describe('When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.'),
   "venue": zod.string().max(getRosterResponseEventsItemVenueMax).nullish().describe('Where it is, if set.'),
-  "mapUrl": zod.string().max(getRosterResponseEventsItemMapUrlMax).nullish().describe('A web link (http or https) to the venue\'s map, if set.')
+  "mapUrl": zod.string().max(getRosterResponseEventsItemMapUrlMax).nullish().describe('A web link (http or https) to the venue\'s map, if set.'),
+  "hasSeating": zod.boolean().optional().describe('Whether students see their seat on the hall plan for this event. May be absent from older offline copies.')
 })),
   "students": zod.array(zod.object({
   "studentId": zod.string(),
   "fullName": zod.string(),
   "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
   "note": zod.string().max(getRosterResponseStudentsItemNoteMax).nullish().describe('A note for staff about this student (never on the public card). May be absent from older offline copies.'),
+  "seatRow": zod.string().nullish().describe('Row letter of the student\'s fixed seat (A is the front row), when assigned. May be absent from older offline copies.'),
+  "seatNumber": zod.int().nullish().describe('Seat number within the row, when assigned. May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 })),
   "registrations": zod.array(zod.object({
@@ -142,6 +145,8 @@ export const SubmitScansResponse = zod.object({
   "fullName": zod.string(),
   "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
   "note": zod.string().max(submitScansResponseResultsItemStudentOneNoteMax).nullish().describe('A note for staff about this student (never on the public card). May be absent from older offline copies.'),
+  "seatRow": zod.string().nullish().describe('Row letter of the student\'s fixed seat (A is the front row), when assigned. May be absent from older offline copies.'),
+  "seatNumber": zod.int().nullish().describe('Seat number within the row, when assigned. May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 }),zod.null()]).describe('Null when the student ID is unknown.'),
   "registration": zod.union([zod.object({
@@ -201,7 +206,8 @@ export const UpdateEventBody = zod.object({
   "isOpen": zod.boolean().optional(),
   "startsAt": zod.iso.datetime({"offset":true}).nullish().describe('When it starts (UTC, ISO 8601); null clears it.'),
   "venue": zod.string().max(updateEventBodyVenueMax).nullish().describe('Where it is; null or empty clears it.'),
-  "mapUrl": zod.string().max(updateEventBodyMapUrlMax).regex(updateEventBodyMapUrlRegExp).nullish().describe('A web link (http or https) to the venue\'s map; null or empty clears it.')
+  "mapUrl": zod.string().max(updateEventBodyMapUrlMax).regex(updateEventBodyMapUrlRegExp).nullish().describe('A web link (http or https) to the venue\'s map; null or empty clears it.'),
+  "hasSeating": zod.boolean().optional()
 }).describe('The fields to change; leave out what stays as it is.')
 
 export const updateEventResponseVenueMax = 200;
@@ -217,7 +223,8 @@ export const UpdateEventResponse = zod.object({
   "isOpen": zod.boolean().describe('Scanners only offer open events.'),
   "startsAt": zod.iso.datetime({"offset":true}).nullish().describe('When it starts (UTC, ISO 8601), if set. May be absent from older offline copies.'),
   "venue": zod.string().max(updateEventResponseVenueMax).nullish().describe('Where it is, if set.'),
-  "mapUrl": zod.string().max(updateEventResponseMapUrlMax).nullish().describe('A web link (http or https) to the venue\'s map, if set.')
+  "mapUrl": zod.string().max(updateEventResponseMapUrlMax).nullish().describe('A web link (http or https) to the venue\'s map, if set.'),
+  "hasSeating": zod.boolean().optional().describe('Whether students see their seat on the hall plan for this event. May be absent from older offline copies.')
 })
 
 
@@ -250,6 +257,8 @@ export const SetStudentNoteResponse = zod.object({
   "fullName": zod.string(),
   "major": zod.string().nullish().describe('Field of study, when supplied by the roster. May be absent from older offline copies.'),
   "note": zod.string().max(setStudentNoteResponseNoteMax).nullish().describe('A note for staff about this student (never on the public card). May be absent from older offline copies.'),
+  "seatRow": zod.string().nullish().describe('Row letter of the student\'s fixed seat (A is the front row), when assigned. May be absent from older offline copies.'),
+  "seatNumber": zod.int().nullish().describe('Seat number within the row, when assigned. May be absent from older offline copies.'),
   "isActive": zod.boolean().describe('False once the student\'s access has been revoked.')
 })
 
@@ -271,6 +280,8 @@ export const GetCardResponse = zod.object({
   "fullName": zod.string(),
   "major": zod.string().nullish().describe('Field of study, when supplied by the roster.'),
   "isActive": zod.boolean(),
+  "seatRow": zod.string().nullable().describe('Row letter of the student\'s fixed seat, if assigned.'),
+  "seatNumber": zod.int().nullable().describe('Seat number within the row, if assigned.'),
   "events": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -278,6 +289,7 @@ export const GetCardResponse = zod.object({
   "startsAt": zod.iso.datetime({"offset":true}).nullable().describe('When it starts (UTC, ISO 8601), if set.'),
   "venue": zod.string().nullable().describe('Where it is, if set.'),
   "mapUrl": zod.string().nullable().describe('A web link to the venue\'s map, if set.'),
+  "hasSeating": zod.boolean().describe('Whether the card shows the student\'s seat for this event.'),
   "checkedInAt": zod.iso.datetime({"offset":true}).nullable().describe('When the student checked in (UTC, ISO 8601); null until then.')
 })).describe('Only the events this student is registered for, in event order.')
 })

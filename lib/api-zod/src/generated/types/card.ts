@@ -17,6 +17,16 @@ export interface Card {
      */
   major?: string | null;
   isActive: boolean;
+  /**
+     * Row letter of the student's fixed seat, if assigned.
+     * @nullable
+     */
+  seatRow: string | null;
+  /**
+     * Seat number within the row, if assigned.
+     * @nullable
+     */
+  seatNumber: number | null;
   /** Only the events this student is registered for, in event order. */
   events: CardEvent[];
 }

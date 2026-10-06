@@ -89,3 +89,22 @@ describe("resolveTypedId", () => {
     expect(resolveTypedId(students, "   ", 8)).toEqual({ kind: "none" });
   });
 });
+
+describe("studentMatcher by seat", () => {
+  const students = makeRoster().students.map((student, i) => ({
+    ...student,
+    ...(i === 0 && { seatRow: "F", seatNumber: 7 }),
+  }));
+  const found = (text: string) =>
+    students.filter(studentMatcher(text)!).map((s) => s.studentId);
+
+  it("finds the student who sits there, however the seat is typed", () => {
+    for (const text of ["F7", "f7", "F 7", "f-7"]) {
+      expect(found(text)).toEqual(["1001"]);
+    }
+  });
+
+  it("finds nobody for a seat nobody holds", () => {
+    expect(found("F8")).toEqual([]);
+  });
+});

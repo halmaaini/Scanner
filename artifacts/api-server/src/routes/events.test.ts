@@ -112,4 +112,15 @@ describeWithDb("open or close an event", () => {
     const client = await signedInAs("sara", "admin");
     expect((await change(client, { venue: "Hall" })).status).toBe(403);
   });
+
+  it("lets the super admin switch the seating plan on and off for an event", async () => {
+    await addEvent("graduation");
+    const client = await signedInAs("boss", "super");
+    expect((await change(client, { hasSeating: true })).body.hasSeating).toBe(
+      true,
+    );
+    expect((await change(client, { hasSeating: false })).body.hasSeating).toBe(
+      false,
+    );
+  });
 });

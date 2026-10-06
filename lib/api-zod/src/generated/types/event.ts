@@ -31,4 +31,6 @@ export interface Event {
      * @nullable
      */
   mapUrl?: string | null;
+  /** Whether students see their seat on the hall plan for this event. May be absent from older offline copies. */
+  hasSeating?: boolean;
 }

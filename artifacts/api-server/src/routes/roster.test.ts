@@ -57,6 +57,7 @@ describeWithDb("roster", () => {
           startsAt: null,
           venue: null,
           mapUrl: null,
+          hasSeating: false,
         },
         {
           id: "graduation",
@@ -66,6 +67,7 @@ describeWithDb("roster", () => {
           startsAt: null,
           venue: null,
           mapUrl: null,
+          hasSeating: false,
         },
       ],
       students: [
@@ -74,6 +76,8 @@ describeWithDb("roster", () => {
           fullName: "Layla Hassan",
           major: null,
           note: null,
+          seatRow: null,
+          seatNumber: null,
           isActive: true,
         },
         {
@@ -81,6 +85,8 @@ describeWithDb("roster", () => {
           fullName: "Yusuf Ibrahim",
           major: null,
           note: null,
+          seatRow: null,
+          seatNumber: null,
           isActive: true,
         },
         {
@@ -88,6 +94,8 @@ describeWithDb("roster", () => {
           fullName: "Karim Nasser",
           major: null,
           note: null,
+          seatRow: null,
+          seatNumber: null,
           isActive: false,
         },
       ],

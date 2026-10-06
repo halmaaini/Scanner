@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { pool } from "@workspace/db";
 import {
   addEvent,
   addStaff,
@@ -72,5 +73,50 @@ describeWithDb("student notes", () => {
     expect(card.status).toBe(200);
     expect(JSON.stringify(card.body)).not.toContain("gate");
     expect(card.body).not.toHaveProperty("note");
+  });
+
+  it("keeps seats unique and well formed in the database", async () => {
+    await addStudent("1001");
+    await addStudent("1002");
+    const seat = (id: string, row: string | null, no: number | null) =>
+      pool.query(
+        "update students set seat_row = $2, seat_number = $3 where student_id = $1",
+        [id, row, no],
+      );
+
+    await seat("1001", "F", 7);
+    await expect(seat("1002", "F", 7)).rejects.toThrow(/students_seat_key/);
+    await expect(seat("1002", "F", null)).rejects.toThrow(
+      /students_seat_check/,
+    );
+    await expect(seat("1002", "f", 7)).rejects.toThrow(/students_seat_check/);
+    await expect(seat("1002", "FF", 7)).rejects.toThrow(/students_seat_check/);
+    await expect(seat("1002", "F", 0)).rejects.toThrow(/students_seat_check/);
+    // Two students without a seat are fine, and a seat can be given up.
+    await seat("1001", null, null);
+    await seat("1002", null, null);
+  });
+
+  it("sends the seat to staff in the roster and on a scan result", async () => {
+    await addEvent("graduation");
+    await addStudent("1001");
+    await register("1001", "graduation");
+    await pool.query(
+      "update students set seat_row = 'A', seat_number = 12 where student_id = '1001'",
+    );
+    const admin = await signedInAs("sara", "admin");
+
+    const roster = await admin.get("/api/roster");
+    expect(roster.body.students[0]).toMatchObject({
+      seatRow: "A",
+      seatNumber: 12,
+    });
+    const result = await admin
+      .post("/api/scans")
+      .send({ scans: [scan("1001", "graduation")] });
+    expect(result.body.results[0].student).toMatchObject({
+      seatRow: "A",
+      seatNumber: 12,
+    });
   });
 });

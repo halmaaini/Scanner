@@ -57,6 +57,8 @@ describeWithDb("scans", () => {
           fullName: "Layla Hassan",
           major: null,
           note: null,
+          seatRow: null,
+          seatNumber: null,
           isActive: true,
         },
         registration: {
@@ -126,6 +128,8 @@ describeWithDb("scans", () => {
       fullName: "Karim",
       major: null,
       note: null,
+      seatRow: null,
+      seatNumber: null,
       isActive: false,
     });
     // Nothing was recorded.

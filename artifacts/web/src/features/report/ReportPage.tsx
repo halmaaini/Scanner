@@ -10,7 +10,8 @@ import { attendeeRows, type AttendeeStatus } from "@/domain/attendees";
 import { buildAttendanceCsv } from "@/domain/export";
 import { summarizeEvents } from "@/domain/summary";
 import { useCurrentStaff } from "@/features/auth/StaffContext";
-import { describeResult } from "@/features/scanner/describeResult";
+import { SeatsView } from "@/features/seating/SeatsView";
+import { useListCheckIn } from "./useListCheckIn";
 import { IssuesBanner } from "@/features/scanner/IssuesBanner";
 import { Notice } from "@/features/scanner/Notice";
 import { SyncStatus } from "@/features/scanner/SyncStatus";
@@ -19,7 +20,6 @@ import { downloadTextFile } from "@/lib/download";
 import { formatDay, formatWhen } from "@/lib/format";
 import { StudentNote } from "@/features/notes/StudentNote";
 import { m } from "@/messages";
-import { scanning } from "@/offline";
 import { useRosterView } from "@/offline/hooks";
 
 const STATUSES: AttendeeStatus[] = ["all", "in", "out"];
@@ -31,16 +31,25 @@ export function ReportPage() {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<AttendeeStatus>("all");
   const [chosenEvent, setChosenEvent] = useState<string>();
-  const [checkingIn, setCheckingIn] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [tab, setTab] = useState<"list" | "seats">("list");
 
+  const { checkIn, checkingIn, notice, clearNotice } = useListCheckIn(
+    view,
+    chosenEvent && view?.events.some((e) => e.id === chosenEvent)
+      ? chosenEvent
+      : view?.events[0]?.id,
+  );
   const summaries = useMemo(() => (view ? summarizeEvents(view) : []), [view]);
   const eventId =
     chosenEvent && view?.events.some((e) => e.id === chosenEvent)
       ? chosenEvent
       : view?.events[0]?.id;
   // Check-ins are only for open events; a closed one is for looking.
-  const eventOpen = view?.events.find((e) => e.id === eventId)?.isOpen ?? false;
+  const chosen = view?.events.find((e) => e.id === eventId);
+  const eventOpen = chosen?.isOpen ?? false;
+  // The seat plan is only offered for events that have one.
+  const seated = chosen?.hasSeating ?? false;
+  const showTab = seated ? tab : "list";
   const rows = useMemo(
     () =>
       view && eventId
@@ -52,36 +61,6 @@ export function ReportPage() {
   function exportCsv() {
     if (!view) return;
     downloadTextFile(`attendance-${formatDay()}.csv`, buildAttendanceCsv(view));
-  }
-
-  async function checkIn(studentId: string, name: string) {
-    if (!view || !eventId || checkingIn) return;
-    setCheckingIn(studentId);
-    try {
-      const response = await scanning.scan({
-        raw: studentId,
-        eventId,
-        staffId: staff.id,
-        view,
-      });
-      if (!response || response.kind === "unavailable") {
-        setNotice(m.scanner.noRosterOffline);
-      } else {
-        const { title, offlineNote } = describeResult({
-          result: response.result,
-          offline: response.kind === "offline",
-          eventName: view.events.find((e) => e.id === eventId)?.name ?? eventId,
-          staffName: () => undefined,
-        });
-        setNotice(
-          [`${name}: ${title}`, offlineNote].filter(Boolean).join(". "),
-        );
-      }
-    } catch {
-      setNotice(m.scanner.scanFailed);
-    } finally {
-      setCheckingIn(null);
-    }
   }
 
   return (
@@ -179,114 +158,156 @@ export function ReportPage() {
                 </select>
               </div>
 
-              <Field
-                label={m.report.findStudent}
-                type="search"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={m.report.findPlaceholder}
-                autoComplete="off"
-                spellCheck={false}
-              />
-
-              <div
-                role="group"
-                aria-label={m.report.filter}
-                className="flex gap-2"
-              >
-                {STATUSES.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={status === value}
-                    onClick={() => setStatus(value)}
-                    className={cn(
-                      "min-h-11 flex-1 rounded-xl border-[1.5px] px-3 text-[15px] font-semibold",
-                      status === value
-                        ? "border-ink bg-ink text-white"
-                        : "border-line bg-surface text-ink",
-                    )}
-                  >
-                    {m.report.filters[value]}
-                  </button>
-                ))}
-              </div>
-
-              <p aria-live="polite" className="text-sm text-muted">
-                {m.report.shown(rows.length)}
-              </p>
-              {rows.length === 0 && (
-                <p className="text-muted">{m.report.noMatches}</p>
-              )}
-              <ul className="flex flex-col">
-                {rows.map(({ student, registration, checkedInByName }) => (
-                  <li
-                    key={student.studentId}
-                    className="flex flex-col gap-2 border-b border-rule py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 flex-col">
-                        <span className="font-semibold">
-                          <bdi>{student.fullName}</bdi>
-                        </span>
-                        <span className="text-sm text-muted">
-                          {student.studentId}
-                          {student.major && (
-                            <>
-                              {" · "}
-                              <bdi>{student.major}</bdi>
-                            </>
-                          )}
-                        </span>
-                        <span
-                          className={cn(
-                            "text-sm font-semibold",
-                            registration.checkedInAt ? "text-ok" : "text-muted",
-                          )}
-                        >
-                          {registration.checkedInAt
-                            ? m.report.checkedInAt(
-                                formatWhen(registration.checkedInAt),
-                                checkedInByName,
-                              )
-                            : m.report.notYet}
-                        </span>
-                      </div>
-                      {!student.isActive ? (
-                        <span className="shrink-0 rounded-full bg-bad-soft px-2.5 py-1 text-[13px] font-semibold text-bad">
-                          {m.report.revoked}
-                        </span>
-                      ) : (
-                        !registration.checkedInAt &&
-                        (eventOpen ? (
-                          <Button
-                            variant="outline"
-                            size="compact"
-                            aria-label={m.report.checkInStudent(
-                              student.fullName,
-                            )}
-                            busy={checkingIn === student.studentId}
-                            disabled={checkingIn !== null}
-                            onClick={() =>
-                              void checkIn(student.studentId, student.fullName)
-                            }
-                          >
-                            {m.report.checkIn}
-                          </Button>
-                        ) : (
-                          <span className="shrink-0 text-sm text-muted">
-                            {m.events.closed}
-                          </span>
-                        ))
+              {seated && (
+                <div
+                  role="group"
+                  aria-label={m.seating.views}
+                  className="flex gap-2"
+                >
+                  {(["list", "seats"] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={showTab === value}
+                      onClick={() => setTab(value)}
+                      className={cn(
+                        "min-h-11 flex-1 rounded-xl border-[1.5px] px-3 text-[15px] font-semibold",
+                        showTab === value
+                          ? "border-ink bg-ink text-white"
+                          : "border-line bg-surface text-ink",
                       )}
-                    </div>
-                    <StudentNote
-                      studentId={student.studentId}
-                      note={student.note}
-                    />
-                  </li>
-                ))}
-              </ul>
+                    >
+                      {value === "list" ? m.seating.listTab : m.seating.tab}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {showTab === "seats" ? (
+                <SeatsView
+                  roster={view}
+                  eventId={eventId}
+                  eventOpen={eventOpen}
+                  checkIn={checkIn}
+                  checkingIn={checkingIn}
+                />
+              ) : (
+                <>
+                  <Field
+                    label={m.report.findStudent}
+                    type="search"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder={m.report.findPlaceholder}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+
+                  <div
+                    role="group"
+                    aria-label={m.report.filter}
+                    className="flex gap-2"
+                  >
+                    {STATUSES.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={status === value}
+                        onClick={() => setStatus(value)}
+                        className={cn(
+                          "min-h-11 flex-1 rounded-xl border-[1.5px] px-3 text-[15px] font-semibold",
+                          status === value
+                            ? "border-ink bg-ink text-white"
+                            : "border-line bg-surface text-ink",
+                        )}
+                      >
+                        {m.report.filters[value]}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p aria-live="polite" className="text-sm text-muted">
+                    {m.report.shown(rows.length)}
+                  </p>
+                  {rows.length === 0 && (
+                    <p className="text-muted">{m.report.noMatches}</p>
+                  )}
+                  <ul className="flex flex-col">
+                    {rows.map(({ student, registration, checkedInByName }) => (
+                      <li
+                        key={student.studentId}
+                        className="flex flex-col gap-2 border-b border-rule py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 flex-col">
+                            <span className="font-semibold">
+                              <bdi>{student.fullName}</bdi>
+                            </span>
+                            <span className="text-sm text-muted">
+                              {student.studentId}
+                              {student.major && (
+                                <>
+                                  {" · "}
+                                  <bdi>{student.major}</bdi>
+                                </>
+                              )}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-sm font-semibold",
+                                registration.checkedInAt
+                                  ? "text-ok"
+                                  : "text-muted",
+                              )}
+                            >
+                              {registration.checkedInAt
+                                ? m.report.checkedInAt(
+                                    formatWhen(registration.checkedInAt),
+                                    checkedInByName,
+                                  )
+                                : m.report.notYet}
+                            </span>
+                          </div>
+                          {!student.isActive ? (
+                            <span className="shrink-0 rounded-full bg-bad-soft px-2.5 py-1 text-[13px] font-semibold text-bad">
+                              {m.report.revoked}
+                            </span>
+                          ) : (
+                            !registration.checkedInAt &&
+                            (eventOpen ? (
+                              <Button
+                                variant="outline"
+                                size="compact"
+                                aria-label={m.report.checkInStudent(
+                                  student.fullName,
+                                )}
+                                busy={checkingIn === student.studentId}
+                                disabled={checkingIn !== null}
+                                onClick={() =>
+                                  void checkIn(
+                                    student.studentId,
+                                    student.fullName,
+                                  )
+                                }
+                              >
+                                {m.report.checkIn}
+                              </Button>
+                            ) : (
+                              <span className="shrink-0 text-sm text-muted">
+                                {m.events.closed}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                        <StudentNote
+                          studentId={student.studentId}
+                          note={student.note}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </section>
           )}
 
@@ -300,7 +321,7 @@ export function ReportPage() {
           </Button>
         </>
       )}
-      <Notice message={notice} onDone={() => setNotice(null)} />
+      <Notice message={notice} onDone={clearNotice} />
     </Screen>
   );
 }

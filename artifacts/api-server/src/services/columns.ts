@@ -31,6 +31,7 @@ export const eventInfoColumns = {
   startsAt: isoTimestamp(eventsTable.startsAt),
   venue: eventsTable.venue,
   mapUrl: eventsTable.mapUrl,
+  hasSeating: eventsTable.hasSeating,
 };
 
 export const eventColumns = {
@@ -44,6 +45,8 @@ export const publicStudentColumns = {
   fullName: studentsTable.fullName,
   major: studentsTable.major,
   isActive: studentsTable.isActive,
+  seatRow: studentsTable.seatRow,
+  seatNumber: studentsTable.seatNumber,
 };
 
 /** A student as staff see them: the public facts plus the staff-only note. */

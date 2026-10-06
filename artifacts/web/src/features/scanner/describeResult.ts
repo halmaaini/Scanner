@@ -1,4 +1,5 @@
 import type { ScanOutcome, ScanResult } from "@workspace/api-client-react";
+import { studentSeat } from "@/domain/seating";
 import { formatTime, formatWhen } from "@/lib/format";
 import { m } from "@/messages";
 
@@ -123,6 +124,19 @@ function rowsFor({ result, eventName, staffName }: Context): ResultRow[] {
   }
 }
 
+/** "F7, Stage Right": where to send the student. Empty when no seat is assigned. */
+function seatRows(student: ScanResult["student"]): ResultRow[] {
+  if (!student?.seatRow || !student.seatNumber) return [];
+  const label = m.seating.seat(student.seatRow, student.seatNumber);
+  const seat = studentSeat(student);
+  return [
+    {
+      label: m.results.seat,
+      value: seat ? `${label}, ${m.seating.side[seat.side]}` : label,
+    },
+  ];
+}
+
 function offlineNoteFor(result: ScanResult): string {
   if (result.outcome === "checked_in") return m.results.offline.saved;
   if (result.outcome === "unknown_student")
@@ -147,6 +161,7 @@ export function describeResult(context: Context): ResultDescription {
       ...(result.student?.major
         ? [{ label: m.results.major, value: result.student.major }]
         : []),
+      ...seatRows(result.student),
       ...rowsFor(context),
     ],
     ...(offline ? { offlineNote: offlineNoteFor(result) } : {}),

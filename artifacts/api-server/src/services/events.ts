@@ -14,9 +14,10 @@ export async function updateEvent(
   eventId: string,
   change: EventChange,
 ): Promise<Event> {
-  const { isOpen, startsAt, venue, mapUrl } = change;
+  const { isOpen, startsAt, venue, mapUrl, hasSeating } = change;
   const changes = {
     ...(isOpen !== undefined && { isOpen }),
+    ...(hasSeating !== undefined && { hasSeating }),
     ...(startsAt !== undefined && {
       startsAt: startsAt === null ? null : new Date(startsAt),
     }),

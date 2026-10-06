@@ -146,6 +146,8 @@ export const m = {
   results: {
     scanNext: "Scan next",
     major: "Major",
+    seat: "Seat",
+    studentLabel: "Student ID",
     undo: "Undo check-in",
     undoing: "Undoing…",
     event: "Event",
@@ -205,7 +207,7 @@ export const m = {
     attendees: "Attendees",
     event: "Event",
     findStudent: "Find a student",
-    findPlaceholder: "Name or part of the student ID",
+    findPlaceholder: "Name, part of the ID, or seat (F7)",
     filter: "Show",
     filters: { all: "All", in: "Checked in", out: "Not yet" },
     shown: (n: number) => `${n} ${plural(n, "student", "students")}`,
@@ -217,6 +219,62 @@ export const m = {
     checkIn: "Check in",
     revoked: "Access revoked",
     exportCsv: "Export CSV",
+  },
+
+  seating: {
+    zoom: "Zoom",
+    wholeHall: "Whole hall",
+    studentArea: "Student area",
+    mySeat: "My seat",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    stageLeft: "STAGE LEFT",
+    stageRight: "STAGE RIGHT",
+    pool: "POOL",
+    stage: "STAGE",
+    you: "YOU",
+    seatLabel: (row: string, number: number) => `Row ${row}, seat ${number}`,
+    seat: (row: string, number: number) => `${row}${number}`,
+    side: { left: "Stage Left", right: "Stage Right" },
+    tapToZoom: "Tap the plan to zoom in, then tap a seat.",
+    tab: "Seats",
+    listTab: "List",
+    views: "View",
+    planFor: (event: string) => `Seating plan for ${event}`,
+    counts: (present: number, expected: number) =>
+      `${present} seated, ${expected} still to come`,
+    legend: {
+      present: "Checked in",
+      expected: "Not yet",
+      revoked: "Access revoked",
+      empty: "Nobody assigned",
+    },
+    noSeat: (n: number) =>
+      `${n} ${plural(n, "student has", "students have")} no seat yet`,
+    offPlan: (n: number) =>
+      `${n} ${plural(n, "student has", "students have")} a seat that is not on the plan`,
+    sheet: {
+      status: "Status",
+      close: "Close",
+      empty: "Nobody is assigned to this seat.",
+      notYet: "Not yet checked in",
+    },
+    // The student's card.
+    card: {
+      title: "Your seat",
+      row: "Row",
+      seat: "Seat",
+      side: "Side",
+      notAssigned: "Your seat has not been assigned yet.",
+      offPlan: "Please ask the staff to help you find your seat.",
+      rowsBack: (n: number) =>
+        n === 0
+          ? "Your row is the front row, next to the stage."
+          : `Your row is ${n} ${plural(n, "row", "rows")} back from the stage.`,
+      where: (side: string, seat: number, total: number) =>
+        `You are on the ${side} side, seat ${seat} of ${total} in the row.`,
+      planLabel: "Your seat in the hall",
+    },
   },
 
   note: {
@@ -250,6 +308,7 @@ export const m = {
     venue: "Venue",
     mapUrl: "Map link",
     mapHint: "A web link, such as a Google Maps share link.",
+    hasSeating: "Show the seating plan on student cards",
     save: "Save details",
     saved: "Saved",
     invalidLink: "The map link must start with http:// or https://",

@@ -94,6 +94,7 @@ or reads it. To change a fact, change it there.
 | API contract             | `lib/api-spec/openapi.yaml`                                    | server validation and web client, both generated                                 |
 | Who can be admitted      | `lib/attendance` `evaluateScan` / `isRecorded`                 | the server, and the scanner's offline mode                                       |
 | Student ID cleaning      | `lib/attendance` `normalizeStudentId`                          | server and web; the database's ID check is built from the same rule              |
+| The hall's seats         | `lib/attendance/src/hall.ts`                                   | the card's plan, the live Seats view, search and the check that a seat exists    |
 | Roles and permissions    | the spec's `StaffRole`, then `lib/attendance`                  | server checks and web menus; the database's copy is checked by a test            |
 | What the app knows       | `GET /api/roster`                                              | scanner, report, counts, CSV and the offline copy all read it                    |
 | Counting attendance      | `web/src/domain/summary.ts`                                    | scanner header and report                                                        |

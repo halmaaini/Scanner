@@ -20,6 +20,7 @@ import { m } from "@/messages";
 import { studentIdFromParam } from "./cardPath";
 import { initialsOf } from "./initials";
 import { BigQr } from "./BigQr";
+import { SeatSection } from "./SeatSection";
 
 /** Public: a student's card with their QR code and which events they have attended. */
 export function CardPage({ studentId }: { studentId: string }) {
@@ -149,6 +150,8 @@ function CardView({ card, savedCopy, refreshing, onRefresh }: CardViewProps) {
       {savedCopy && (
         <p className="text-sm font-semibold text-warn">{m.card.offlineCopy}</p>
       )}
+
+      <SeatSection card={card} />
 
       <section aria-labelledby="attendance-title" className="flex flex-col">
         <h2

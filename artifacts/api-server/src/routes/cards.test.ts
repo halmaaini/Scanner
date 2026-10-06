@@ -30,6 +30,8 @@ describeWithDb("cards", () => {
       studentId: "1001",
       fullName: "Layla Hassan",
       major: null,
+      seatRow: null,
+      seatNumber: null,
       isActive: true,
       events: [
         {
@@ -39,6 +41,7 @@ describeWithDb("cards", () => {
           startsAt: null,
           venue: null,
           mapUrl: null,
+          hasSeating: false,
           checkedInAt: "2026-06-11T09:14:00.000Z",
         },
         {
@@ -48,6 +51,7 @@ describeWithDb("cards", () => {
           startsAt: null,
           venue: null,
           mapUrl: null,
+          hasSeating: false,
           checkedInAt: null,
         },
       ],
@@ -118,5 +122,31 @@ describeWithDb("cards", () => {
       mapUrl: "https://maps.example.com/h",
     });
     expect(res.body.events[0]).not.toHaveProperty("isOpen");
+  });
+
+  it("shows the student's seat and which events show the plan", async () => {
+    await addEvent("rehearsal", { name: "Rehearsal", sortOrder: 1 });
+    await addEvent("trophy", { name: "Trophy", sortOrder: 2 });
+    await pool.query(
+      "update events set has_seating = true where id = 'rehearsal'",
+    );
+    await addStudent("1001");
+    await pool.query(
+      "update students set seat_row = 'F', seat_number = 7 where student_id = '1001'",
+    );
+    await register("1001", "rehearsal");
+    await register("1001", "trophy");
+
+    const res = await createClient().get("/api/cards/1001");
+    expect(res.body).toMatchObject({ seatRow: "F", seatNumber: 7 });
+    expect(
+      res.body.events.map((e: { id: string; hasSeating: boolean }) => [
+        e.id,
+        e.hasSeating,
+      ]),
+    ).toEqual([
+      ["rehearsal", true],
+      ["trophy", false],
+    ]);
   });
 });

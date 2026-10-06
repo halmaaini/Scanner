@@ -63,7 +63,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],
         navigateFallback: `${basePath}index.html`,
         // API calls are never answered from the app shell.
         navigateFallbackDenylist: [/^\/api\//],

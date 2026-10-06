@@ -55,6 +55,17 @@ INSERT INTO students (student_id, full_name, is_active)
 SELECT student_id, full_name, is_active FROM demo_students
 ON CONFLICT (student_id) DO NOTHING;
 
+-- The rehearsal and the ceremony show the seating plan; every student has one fixed seat
+-- (the last two are left without one on purpose, so the "no seat yet" notice has something to show).
+UPDATE events SET has_seating = true WHERE id IN ('rehearsal', 'graduation');
+UPDATE students s
+SET seat_row = d.seat_row, seat_number = d.seat_number
+FROM (VALUES
+  ('1001', 'F', 7), ('1002', 'B', 4), ('1003', 'K', 3), ('1004', 'A', 1), ('1005', 'A', 12),
+  ('1006', 'C', 9), ('1007', 'E', 8), ('1008', 'R', 2)
+) AS d (student_id, seat_row, seat_number)
+WHERE s.student_id = d.student_id AND s.seat_row IS NULL;
+
 -- Everyone is on the rehearsal and graduation lists; only three get a trophy.
 INSERT INTO registrations (student_id, event_id)
 SELECT s.student_id, e.id

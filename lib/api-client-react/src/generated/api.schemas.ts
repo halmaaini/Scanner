@@ -82,6 +82,8 @@ export interface Event {
      * @nullable
      */
   mapUrl?: string | null;
+  /** Whether students see their seat on the hall plan for this event. May be absent from older offline copies. */
+  hasSeating?: boolean;
 }
 
 /**
@@ -107,6 +109,7 @@ export interface EventChange {
      * @pattern ^(https?://\S+)?$
      */
   mapUrl?: string | null;
+  hasSeating?: boolean;
 }
 
 export interface StudentNoteChange {
@@ -132,6 +135,16 @@ export interface Student {
      * @nullable
      */
   note?: string | null;
+  /**
+     * Row letter of the student's fixed seat (A is the front row), when assigned. May be absent from older offline copies.
+     * @nullable
+     */
+  seatRow?: string | null;
+  /**
+     * Seat number within the row, when assigned. May be absent from older offline copies.
+     * @nullable
+     */
+  seatNumber?: number | null;
   /** False once the student's access has been revoked. */
   isActive: boolean;
 }
@@ -237,6 +250,8 @@ export interface CardEvent {
      * @nullable
      */
   mapUrl: string | null;
+  /** Whether the card shows the student's seat for this event. */
+  hasSeating: boolean;
   /**
      * When the student checked in (UTC, ISO 8601); null until then.
      * @nullable
@@ -253,6 +268,16 @@ export interface Card {
      */
   major?: string | null;
   isActive: boolean;
+  /**
+     * Row letter of the student's fixed seat, if assigned.
+     * @nullable
+     */
+  seatRow: string | null;
+  /**
+     * Seat number within the row, if assigned.
+     * @nullable
+     */
+  seatNumber: number | null;
   /** Only the events this student is registered for, in event order. */
   events: CardEvent[];
 }

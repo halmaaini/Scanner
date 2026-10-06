@@ -1,4 +1,4 @@
-import { normalizeStudentId } from "@workspace/attendance";
+import { normalizeStudentId, parseSeat } from "@workspace/attendance";
 import type { Student } from "./roster";
 
 /**
@@ -19,8 +19,9 @@ export function foldName(text: string): string {
 
 /**
  * Whether what a person typed points at this student: part of the ID in any
- * letter case ("1234" finds "S0000001234"), or part of the name (spelling
- * tolerant). Undefined for a blank query, which points at nobody.
+ * letter case ("1234" finds "S0000001234"), part of the name (spelling
+ * tolerant), or their seat ("F7"). Undefined for a blank query, which points
+ * at nobody.
  */
 export function studentMatcher(
   query: string,
@@ -30,9 +31,13 @@ export function studentMatcher(
 
   const idQuery = normalizeStudentId(trimmed).toLowerCase();
   const nameQuery = foldName(trimmed);
+  const seat = parseSeat(trimmed);
   return (student) =>
     (idQuery !== "" && student.studentId.toLowerCase().includes(idQuery)) ||
-    foldName(student.fullName).includes(nameQuery);
+    foldName(student.fullName).includes(nameQuery) ||
+    (seat !== null &&
+      student.seatRow === seat.row &&
+      student.seatNumber === seat.number);
 }
 
 /** What typing something at the scanner leads to. */

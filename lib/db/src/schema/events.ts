@@ -30,6 +30,8 @@ export const eventsTable = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }),
     venue: text("venue"),
     mapUrl: text("map_url"),
+    // Whether the card shows the student's seat on the hall plan for this event.
+    hasSeating: boolean("has_seating").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

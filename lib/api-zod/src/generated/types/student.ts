@@ -21,6 +21,16 @@ export interface Student {
      * @nullable
      */
   note?: string | null;
+  /**
+     * Row letter of the student's fixed seat (A is the front row), when assigned. May be absent from older offline copies.
+     * @nullable
+     */
+  seatRow?: string | null;
+  /**
+     * Seat number within the row, when assigned. May be absent from older offline copies.
+     * @nullable
+     */
+  seatNumber?: number | null;
   /** False once the student's access has been revoked. */
   isActive: boolean;
 }

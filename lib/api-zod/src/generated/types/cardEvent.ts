@@ -26,6 +26,8 @@ export interface CardEvent {
      * @nullable
      */
   mapUrl: string | null;
+  /** Whether the card shows the student's seat for this event. */
+  hasSeating: boolean;
   /**
      * When the student checked in (UTC, ISO 8601); null until then.
      * @nullable

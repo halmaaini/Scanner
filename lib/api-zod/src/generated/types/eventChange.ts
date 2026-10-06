@@ -30,4 +30,5 @@ export interface EventChange {
      * @pattern ^(https?://\S+)?$
      */
   mapUrl?: string | null;
+  hasSeating?: boolean;
 }

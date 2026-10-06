@@ -16,3 +16,16 @@ export {
   MAX_VENUE_LENGTH,
   MAX_MAP_URL_LENGTH,
 } from "./limits";
+export {
+  HALL_AISLE_AFTER,
+  HALL_COLUMNS,
+  HALL_EXTRA_ROWS,
+  HALL_ROWS,
+  MAX_SEAT_NUMBER,
+  findSeat,
+  parseSeat,
+  seatLabel,
+  seatsInRow,
+  type HallSeat,
+  type HallSide,
+} from "./hall";

@@ -1,3 +1,4 @@
+import { seatLabel } from "@workspace/attendance";
 import { toCsv } from "@/lib/csv";
 import { formatSpreadsheetTime } from "@/lib/format";
 import { indexRoster, type Roster } from "./roster";
@@ -12,6 +13,7 @@ const HEADER = [
   "student_id",
   "name",
   "major",
+  "seat",
   "event",
   "attended",
   "checked_in_at",
@@ -40,6 +42,9 @@ export function buildAttendanceCsv(roster: Roster): string {
       student.studentId,
       student.fullName,
       student.major ?? "",
+      student.seatRow && student.seatNumber
+        ? seatLabel(student.seatRow, student.seatNumber)
+        : "",
       event.name,
       r.checkedInAt ? "yes" : "no",
       r.checkedInAt ? formatSpreadsheetTime(r.checkedInAt) : "",

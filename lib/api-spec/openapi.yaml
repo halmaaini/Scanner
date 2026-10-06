@@ -431,6 +431,9 @@ components:
           type: [string, "null"]
           maxLength: 500
           description: A web link (http or https) to the venue's map, if set.
+        hasSeating:
+          type: boolean
+          description: Whether students see their seat on the hall plan for this event. May be absent from older offline copies.
     EventChange:
       type: object
       description: The fields to change; leave out what stays as it is.
@@ -451,6 +454,9 @@ components:
           maxLength: 500
           pattern: "^(https?://\\S+)?$"
           description: A web link (http or https) to the venue's map; null or empty clears it.
+        hasSeating:
+          type: boolean
+
     StudentNoteChange:
       type: object
       required: [note]
@@ -475,6 +481,12 @@ components:
           type: [string, "null"]
           maxLength: 300
           description: A note for staff about this student (never on the public card). May be absent from older offline copies.
+        seatRow:
+          type: [string, "null"]
+          description: Row letter of the student's fixed seat (A is the front row), when assigned. May be absent from older offline copies.
+        seatNumber:
+          type: [integer, "null"]
+          description: Seat number within the row, when assigned. May be absent from older offline copies.
         isActive:
           type: boolean
           description: False once the student's access has been revoked.
@@ -601,7 +613,8 @@ components:
             $ref: "#/components/schemas/ScanResult"
     CardEvent:
       type: object
-      required: [id, name, sortOrder, startsAt, venue, mapUrl, checkedInAt]
+      required:
+        [id, name, sortOrder, startsAt, venue, mapUrl, hasSeating, checkedInAt]
       properties:
         id:
           type: string
@@ -619,13 +632,16 @@ components:
         mapUrl:
           type: [string, "null"]
           description: A web link to the venue's map, if set.
+        hasSeating:
+          type: boolean
+          description: Whether the card shows the student's seat for this event.
         checkedInAt:
           type: [string, "null"]
           format: date-time
           description: When the student checked in (UTC, ISO 8601); null until then.
     Card:
       type: object
-      required: [studentId, fullName, isActive, events]
+      required: [studentId, fullName, isActive, seatRow, seatNumber, events]
       properties:
         studentId:
           type: string
@@ -636,6 +652,12 @@ components:
           description: Field of study, when supplied by the roster.
         isActive:
           type: boolean
+        seatRow:
+          type: [string, "null"]
+          description: Row letter of the student's fixed seat, if assigned.
+        seatNumber:
+          type: [integer, "null"]
+          description: Seat number within the row, if assigned.
         events:
           type: array
           description: Only the events this student is registered for, in event order.

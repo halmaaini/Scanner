@@ -15,6 +15,7 @@ export function EventDetails({ event }: { event: Event }) {
   const [startsAt, setStartsAt] = useState(toDateTimeInput(event.startsAt));
   const [venue, setVenue] = useState(event.venue ?? "");
   const [mapUrl, setMapUrl] = useState(event.mapUrl ?? "");
+  const [hasSeating, setHasSeating] = useState(event.hasSeating ?? false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -27,6 +28,7 @@ export function EventDetails({ event }: { event: Event }) {
         startsAt: fromDateTimeInput(startsAt),
         venue,
         mapUrl,
+        hasSeating,
       });
       await patchRoster((roster) => ({
         ...roster,
@@ -88,6 +90,15 @@ export function EventDetails({ event }: { event: Event }) {
         onChange={(e) => setMapUrl(e.target.value)}
       />
       <p className="text-sm text-muted">{m.events.mapHint}</p>
+      <label className="flex min-h-11 items-center gap-3 text-[15px] font-semibold">
+        <input
+          type="checkbox"
+          checked={hasSeating}
+          onChange={(e) => setHasSeating(e.target.checked)}
+          className="size-5 accent-ink"
+        />
+        {m.events.hasSeating}
+      </label>
       {message && (
         <p role="status" className="text-sm font-semibold">
           {message}

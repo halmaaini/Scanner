@@ -254,6 +254,27 @@ describe.skipIf(!testUrl)(
       });
     });
 
+    it("lists the active students that still have no seat", async () => {
+      const { rows } = await pool.query(marked("students-without-seat"));
+      expect(rows.map((r) => r.student_id)).toEqual(["1009", "1010"]);
+    });
+
+    it("swaps two students' seats and keeps everyone else where they were", async () => {
+      const swap = blocks.find((b) => b.sql.startsWith("DO $swap$"));
+      expect(swap).toBeDefined();
+      await inTransaction(async (client) => {
+        await client.query(swap!.sql);
+        const { rows } = await client.query(
+          "select student_id, seat_row || seat_number as seat from students where student_id in ('1001', '1002', '1004') order by student_id",
+        );
+        expect(rows).toEqual([
+          { student_id: "1001", seat: "B4" },
+          { student_id: "1002", seat: "F7" },
+          { student_id: "1004", seat: "A1" },
+        ]);
+      });
+    });
+
     it("puts a copy of the lists aside and brings back deleted rows", async () => {
       const copy = blocks.find((b) => b.sql.startsWith("CREATE TABLE backup_"));
       const restore = blocks.find((b) =>

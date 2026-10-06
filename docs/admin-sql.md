@@ -188,6 +188,14 @@ UPDATE events SET name = 'Graduation ceremony 2026', sort_order = 5
 WHERE id = 'graduation';
 ```
 
+Show the seating plan on student cards for an event (the rehearsal and the
+ceremony use the same seats, so switch it on for both). The super admin can
+also tick it on the Events page:
+
+```sql
+UPDATE events SET has_seating = true WHERE id IN ('rehearsal', 'graduation');
+```
+
 Delete an event you created by mistake. **This also deletes its list and
 every check-in for it:**
 
@@ -239,6 +247,85 @@ psql "$DATABASE_URL" -c "\copy students (student_id, full_name, major) FROM '$HO
 ```
 
 A new student is on **no** event list yet; see [Event lists](#event-lists).
+
+### Seats
+
+Each student has one fixed seat, a row letter and a number (`F` and `7` is
+seat F7; row A is next to the stage). It is the same for every event that
+shows the seating plan. The hall's rows and seat numbers are in
+`lib/attendance/src/hall.ts`; a seat that is not on the plan shows up in the
+Seats view as a warning, so a typo is easy to spot. Nobody can share a seat.
+
+Give or change one student's seat (the database refuses a taken seat):
+
+```sql
+UPDATE students SET seat_row = 'Q', seat_number = 1 WHERE student_id = '1011';
+```
+
+Give many at once, from a spreadsheet or a list. Only the students named change:
+
+```sql
+UPDATE students s
+SET seat_row = d.seat_row, seat_number = d.seat_number
+FROM (VALUES
+  ('1012', 'Q', 2),
+  ('1013', 'Q', 3)
+) AS d (student_id, seat_row, seat_number)
+WHERE s.student_id = d.student_id;
+```
+
+Swap the seats of two students (change the two IDs). It is done in one step,
+because a seat can only have one person at any moment:
+
+```sql
+DO $swap$
+DECLARE
+  a students%ROWTYPE;
+  b students%ROWTYPE;
+BEGIN
+  SELECT * INTO a FROM students WHERE student_id = '1001';
+  SELECT * INTO b FROM students WHERE student_id = '1002';
+  IF a.student_id IS NULL OR b.student_id IS NULL THEN
+    RAISE EXCEPTION 'Both students must exist';
+  END IF;
+  UPDATE students SET seat_row = NULL, seat_number = NULL
+  WHERE student_id IN (a.student_id, b.student_id);
+  UPDATE students SET seat_row = b.seat_row, seat_number = b.seat_number
+  WHERE student_id = a.student_id;
+  UPDATE students SET seat_row = a.seat_row, seat_number = a.seat_number
+  WHERE student_id = b.student_id;
+END $swap$;
+```
+
+Take a seat away from a student:
+
+```sql
+UPDATE students SET seat_row = NULL, seat_number = NULL WHERE student_id = '1011';
+```
+
+Who still has no seat (active students on an event with a seating plan):
+
+<!-- students-without-seat -->
+
+```sql
+SELECT s.student_id, s.full_name
+FROM students s
+WHERE s.seat_row IS NULL AND s.is_active
+  AND EXISTS (
+    SELECT 1 FROM registrations r JOIN events e ON e.id = r.event_id
+    WHERE r.student_id = s.student_id AND e.has_seating
+  )
+ORDER BY s.student_id;
+```
+
+The seat list, front row first:
+
+```sql
+SELECT seat_row, seat_number, student_id, full_name
+FROM students
+WHERE seat_row IS NOT NULL
+ORDER BY seat_row, seat_number;
+```
 
 ### Fix, revoke, renew, remove
 
