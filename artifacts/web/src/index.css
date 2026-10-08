@@ -37,6 +37,15 @@
   --color-water-ink: #2f5d78;
 }
 
+/* Colours only the procession's canvas reads (through themeColor), so no
+   utility class uses them: `static` keeps Tailwind from dropping them. */
+@theme static {
+  /* The graduates in the procession: gown, mortarboard and face. */
+  --color-gown: #1f3566;
+  --color-cap: #0d1526;
+  --color-face: #eed8bf;
+}
+
 @layer base {
   html {
     color-scheme: light;

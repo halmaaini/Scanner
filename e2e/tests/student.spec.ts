@@ -149,4 +149,34 @@ test.describe("the student's card", () => {
       page.getByText("Your seat has not been assigned yet."),
     ).toBeVisible();
   });
+
+  test("shows who sits next to the student and plays the procession", async ({
+    page,
+  }) => {
+    await sql(
+      "update students set seat_row = 'F', seat_number = 8 where student_id = '1009'",
+    );
+    await page.goto("/card/1001");
+    await expect(page.getByText("Sami Aziz")).toBeVisible();
+    await expect(page.getByText("Empty seat")).toBeVisible();
+    await expect(
+      page.getByText("You walk in 4th of 4 in the Stage Right line."),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Watch the procession" }).click();
+    await expect(
+      page.getByRole("img", {
+        name: "The graduates walking in and taking their seats",
+      }),
+    ).toBeVisible();
+    const forward = page.getByRole("button", { name: "Forward 5 s" });
+    while (await forward.isVisible()) await forward.click();
+    // At the end: the views to look round, and a replay.
+    await expect(
+      page.getByRole("button", { name: "Whole hall" }),
+    ).toBeVisible();
+    await expect(page.getByText("0:22 / 0:22")).toBeVisible();
+    await page.getByRole("button", { name: "Replay" }).click();
+    await expect(forward).toBeVisible();
+  });
 });

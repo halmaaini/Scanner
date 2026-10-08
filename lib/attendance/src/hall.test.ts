@@ -3,6 +3,8 @@ import {
   HALL_COLUMNS,
   HALL_ROWS,
   findSeat,
+  marchOrder,
+  neighbourSeats,
   parseSeat,
   seatsInRow,
 } from "./hall";
@@ -71,5 +73,43 @@ describe("parseSeat", () => {
     for (const text of ["", "F", "7", "FF7", "F7x", "layla"]) {
       expect(parseSeat(text)).toBeNull();
     }
+  });
+});
+
+describe("marchOrder", () => {
+  it("walks the front row first, the far end of each row first", () => {
+    expect(
+      marchOrder("left")
+        .slice(0, 3)
+        .map((s) => `${s.row}${s.number}`),
+    ).toEqual(["A1", "A2", "A3"]);
+    expect(
+      marchOrder("right")
+        .slice(0, 3)
+        .map((s) => `${s.row}${s.number}`),
+    ).toEqual(["A18", "A17", "A16"]);
+    expect(marchOrder("right").at(-1)).toMatchObject({ row: "R", number: 10 });
+  });
+
+  it("covers every seat on its side exactly once", () => {
+    const all = HALL_ROWS.flatMap((row) => seatsInRow(row));
+    for (const side of ["left", "right"] as const) {
+      expect(marchOrder(side)).toHaveLength(
+        all.filter((s) => s.side === side).length,
+      );
+    }
+  });
+});
+
+describe("neighbourSeats", () => {
+  it("gives the seats either side within the block", () => {
+    expect(neighbourSeats("F", 7).map((s) => s.number)).toEqual([6, 8]);
+  });
+
+  it("does not reach across the aisle, and an end seat has one neighbour", () => {
+    expect(neighbourSeats("A", 9).map((s) => s.number)).toEqual([8]);
+    expect(neighbourSeats("A", 10).map((s) => s.number)).toEqual([11]);
+    expect(neighbourSeats("F", 4).map((s) => s.number)).toEqual([3]);
+    expect(neighbourSeats("Z", 1)).toEqual([]);
   });
 });

@@ -112,3 +112,25 @@ export function parseSeat(
   if (!match) return null;
   return { row: match[1]!.toUpperCase(), number: Number(match[2]) };
 }
+
+/**
+ * The order graduates walk in for one side of the hall: the front row first,
+ * and in each row the first one in goes to the far end, so nobody squeezes
+ * past anyone already seated. The far end is the outer edge of the block.
+ */
+export function marchOrder(side: HallSide): HallSeat[] {
+  return [...HALL_ROWS].reverse().flatMap((row) => {
+    const seats = seatsInRow(row).filter((seat) => seat.side === side);
+    return side === "right" ? seats.reverse() : seats;
+  });
+}
+
+/** The seats either side of this one in the same block (an aisle or the pool is not a neighbour). */
+export function neighbourSeats(row: string, number: number): HallSeat[] {
+  const seat = findSeat(row, number);
+  if (!seat) return [];
+  return seatsInRow(row).filter(
+    (other) =>
+      other.side === seat.side && Math.abs(other.number - number) === 1,
+  );
+}

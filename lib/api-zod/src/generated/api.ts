@@ -282,6 +282,15 @@ export const GetCardResponse = zod.object({
   "isActive": zod.boolean(),
   "seatRow": zod.string().nullable().describe('Row letter of the student\'s fixed seat, if assigned.'),
   "seatNumber": zod.int().nullable().describe('Seat number within the row, if assigned.'),
+  "neighbours": zod.array(zod.object({
+  "seatRow": zod.string(),
+  "seatNumber": zod.int(),
+  "fullName": zod.string()
+}).describe('Someone in the seat next to the student, in the same block.')).describe('The students in the seats either side of this one, in the same block (never across an aisle). Empty when the student has no seat or none of their events shows the seating plan.\n'),
+  "occupiedSeats": zod.array(zod.object({
+  "seatRow": zod.string(),
+  "seatNumber": zod.int()
+})).describe('Every seat held by an active student (positions only, no names), for the procession on the card: one graduate walks to each. Empty when the student has no seat or none of their events shows the seating plan.\n'),
   "events": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),

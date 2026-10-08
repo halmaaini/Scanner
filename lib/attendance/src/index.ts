@@ -23,6 +23,8 @@ export {
   HALL_ROWS,
   MAX_SEAT_NUMBER,
   findSeat,
+  marchOrder,
+  neighbourSeats,
   parseSeat,
   seatLabel,
   seatsInRow,

@@ -32,6 +32,8 @@ describeWithDb("cards", () => {
       major: null,
       seatRow: null,
       seatNumber: null,
+      neighbours: [],
+      occupiedSeats: [],
       isActive: true,
       events: [
         {
@@ -148,5 +150,45 @@ describeWithDb("cards", () => {
       ["rehearsal", true],
       ["trophy", false],
     ]);
+  });
+
+  it("names the neighbours in the same block and lists the taken seats, for the procession", async () => {
+    await addEvent("graduation", { name: "Graduation" });
+    await pool.query("update events set has_seating = true");
+    const seat = (id: string, row: string, no: number, active = true) =>
+      addStudent(id, `Student ${row}${no}`, active).then(() =>
+        pool.query(
+          "update students set seat_row = $2, seat_number = $3 where student_id = $1",
+          [id, row, no],
+        ),
+      );
+    await seat("1001", "A", 9);
+    await seat("1002", "A", 8);
+    await seat("1003", "A", 10); // across the aisle: not a neighbour
+    await seat("1004", "B", 9); // the row behind: not a neighbour
+    await seat("1005", "C", 1, false); // revoked: does not march
+    await register("1001", "graduation");
+
+    const res = await createClient().get("/api/cards/1001");
+    expect(res.body.neighbours).toEqual([
+      { seatRow: "A", seatNumber: 8, fullName: "Student A8" },
+    ]);
+    expect(res.body.occupiedSeats).toEqual([
+      { seatRow: "A", seatNumber: 8 },
+      { seatRow: "A", seatNumber: 9 },
+      { seatRow: "A", seatNumber: 10 },
+      { seatRow: "B", seatNumber: 9 },
+    ]);
+  });
+
+  it("sends no seating extras when none of the student's events shows the plan", async () => {
+    await addEvent("trophy");
+    await addStudent("1001");
+    await pool.query(
+      "update students set seat_row = 'A', seat_number = 1 where student_id = '1001'",
+    );
+    await register("1001", "trophy");
+    const res = await createClient().get("/api/cards/1001");
+    expect(res.body).toMatchObject({ neighbours: [], occupiedSeats: [] });
   });
 });

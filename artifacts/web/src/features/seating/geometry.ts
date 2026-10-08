@@ -41,8 +41,30 @@ export const POOL = {
 
 /** The student floor, as a drawn outline, and the box views may not leave when zoomed in. */
 export const FLOOR_PATH =
-  "M340,440 Q340,380 400,380 L630,380 Q690,380 690,440 L690,690 Q690,730 745,758 L795,785 L235,785 L285,758 Q340,730 340,690 Z";
-export const FLOOR = { x1: 340, x2: 690, y1: 380, y2: 740 };
+  "M340,422 Q340,362 400,362 L630,362 Q690,362 690,422 L690,690 Q690,730 745,758 L795,785 L235,785 L285,758 Q340,730 340,690 Z";
+export const FLOOR = { x1: 340, x2: 690, y1: 362, y2: 740 };
+/** The block headers ("STAGE LEFT", "STAGE RIGHT") above the first row. */
+export const HEADER_Y = 388;
+
+/**
+ * The procession's paths: up the inside edges of the floor, across the top
+ * (between the floor's edge and the headers), and down the middle aisle,
+ * one lane per side, bending round the pool.
+ */
+export const LANES = {
+  outer: { left: 347, right: 683 },
+  top: 373,
+  aisle: {
+    left: colX(HALL_AISLE_AFTER) + CELL + (AISLE + PITCH - CELL) / 2 - 4.5,
+    right: colX(HALL_AISLE_AFTER) + CELL + (AISLE + PITCH - CELL) / 2 + 4.5,
+  },
+  /** Where each line starts, hidden behind the stage. */
+  start: { left: { x: 300, y: 806 }, right: { x: 730, y: 806 } },
+  /** Where it turns up the side of the floor. */
+  turn: 752,
+  /** How far from the pool's edge the lane keeps. */
+  poolGap: 8,
+};
 export const STAGE = { x: 235, y: 785, w: 560, h: 41 };
 
 export interface View {

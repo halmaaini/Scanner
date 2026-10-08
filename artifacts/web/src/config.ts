@@ -74,3 +74,16 @@ export const STORAGE_KEYS = {
   outbox: "scanner.outbox",
   selectedEvent: "scanner.event",
 } as const;
+
+/**
+ * The procession on the student's card: about `secs` until everyone is
+ * seated, then `holdSecs` of slow close-up on the student's seat and a
+ * `tossSecs` cap toss. `speed` is in plan pixels per second.
+ */
+export const PROCESSION = {
+  secs: 20,
+  holdSecs: 3,
+  tossSecs: 2,
+  speed: 132,
+  forwardSecs: 5,
+} as const;

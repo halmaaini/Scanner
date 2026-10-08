@@ -23,6 +23,7 @@ import {
   BLOCK_W,
   CELL,
   FLOOR_PATH,
+  HEADER_Y,
   MIN_W,
   PLAN_H,
   PLAN_W,
@@ -403,7 +404,7 @@ export function HallPlan({
             <g key={side}>
               <rect
                 x={colX(side === "left" ? 1 : 10)}
-                y={388}
+                y={HEADER_Y}
                 width={9 * 16 - 2}
                 height={14}
                 rx={3}
@@ -411,7 +412,7 @@ export function HallPlan({
               />
               <text
                 x={colX(side === "left" ? 1 : 10) + (9 * 16 - 2) / 2}
-                y={395.5}
+                y={HEADER_Y + 7.5}
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize={8}

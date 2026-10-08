@@ -259,6 +259,20 @@ export interface CardEvent {
   checkedInAt: string | null;
 }
 
+export interface SeatRef {
+  seatRow: string;
+  seatNumber: number;
+}
+
+/**
+ * Someone in the seat next to the student, in the same block.
+ */
+export interface Neighbour {
+  seatRow: string;
+  seatNumber: number;
+  fullName: string;
+}
+
 export interface Card {
   studentId: string;
   fullName: string;
@@ -278,6 +292,10 @@ export interface Card {
      * @nullable
      */
   seatNumber: number | null;
+  /** The students in the seats either side of this one, in the same block (never across an aisle). Empty when the student has no seat or none of their events shows the seating plan. */
+  neighbours: Neighbour[];
+  /** Every seat held by an active student (positions only, no names), for the procession on the card: one graduate walks to each. Empty when the student has no seat or none of their events shows the seating plan. */
+  occupiedSeats: SeatRef[];
   /** Only the events this student is registered for, in event order. */
   events: CardEvent[];
 }

@@ -7,6 +7,9 @@
  */
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+/** 1st, 2nd, 3rd, 4th, 11th, 21st... */
+const ordinal = (n: number) =>
+  `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th")}`;
 
 export const m = {
   brand: {
@@ -274,6 +277,21 @@ export const m = {
       where: (side: string, seat: number, total: number) =>
         `You are on the ${side} side, seat ${seat} of ${total} in the row.`,
       planLabel: "Your seat in the hall",
+      neighbours: "Next to you",
+      seatShort: (row: string, number: number) => `Seat ${row}${number}`,
+      emptySeat: "Empty seat",
+      line: "Your place in the line",
+      place: (place: number, of: number, side: string) =>
+        `You walk in ${ordinal(place)} of ${of} in the ${side} line.`,
+    },
+    procession: {
+      watch: "Watch the procession",
+      replay: "Replay",
+      forward: (secs: number) => `Forward ${secs} s`,
+      label: "The graduates walking in and taking their seats",
+      time: (now: string, total: string) => `${now} / ${total}`,
+      reducedMotion:
+        "Your phone asks for less motion, so this shows the hall once everyone is seated.",
     },
   },
 

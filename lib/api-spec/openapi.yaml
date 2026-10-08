@@ -639,9 +639,38 @@ components:
           type: [string, "null"]
           format: date-time
           description: When the student checked in (UTC, ISO 8601); null until then.
+    SeatRef:
+      type: object
+      required: [seatRow, seatNumber]
+      properties:
+        seatRow:
+          type: string
+        seatNumber:
+          type: integer
+    Neighbour:
+      type: object
+      description: Someone in the seat next to the student, in the same block.
+      required: [seatRow, seatNumber, fullName]
+      properties:
+        seatRow:
+          type: string
+        seatNumber:
+          type: integer
+        fullName:
+          type: string
     Card:
       type: object
-      required: [studentId, fullName, isActive, seatRow, seatNumber, events]
+      required:
+        [
+          studentId,
+          fullName,
+          isActive,
+          seatRow,
+          seatNumber,
+          neighbours,
+          occupiedSeats,
+          events,
+        ]
       properties:
         studentId:
           type: string
@@ -658,6 +687,23 @@ components:
         seatNumber:
           type: [integer, "null"]
           description: Seat number within the row, if assigned.
+        neighbours:
+          type: array
+          description: >
+            The students in the seats either side of this one, in the same
+            block (never across an aisle). Empty when the student has no seat
+            or none of their events shows the seating plan.
+          items:
+            $ref: "#/components/schemas/Neighbour"
+        occupiedSeats:
+          type: array
+          description: >
+            Every seat held by an active student (positions only, no names),
+            for the procession on the card: one graduate walks to each. Empty
+            when the student has no seat or none of their events shows the
+            seating plan.
+          items:
+            $ref: "#/components/schemas/SeatRef"
         events:
           type: array
           description: Only the events this student is registered for, in event order.
