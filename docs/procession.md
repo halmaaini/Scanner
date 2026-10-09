@@ -103,13 +103,17 @@ passing anyone. SL comes back A1, A2, …, A9 into the aisle end, so A1 (first
 back) walks to the far end, seat 1. SR comes back A10, A11, …, A18 into the
 outer end, so A10 (first back) walks to the far end, seat 10.
 
-Open questions:
+Answers (owner):
 
-- Leaving the seats: does the Stage Right half of a row (A10–A18) also leave by
-  the left, walking across the front of the hall, or by its own side and round
-  to the left backstage?
-- When does each row get up: the whole row together when the row before it has
-  been called, or a few rows queue backstage at the same time?
-- Do they always return to the same seat? (Assumed yes.)
-- Step 4: is the walk back from the stage's right exit to the upper right
-  corner outside the student floor (between the floor and the audience)?
+- **Leaving**: both halves of a row leave by the **left**. The Stage Right half
+  (A10–A18) walks across the front of the hall to the left backstage after the
+  Stage Left half. Within each half nobody passes anyone: Stage Left leaves from
+  the outer end (A1 first), Stage Right from the aisle end (A10 first).
+- **Timing**: the next row gets up when about **7–10** people of the current
+  row are still waiting to be called. Ushers guide each row.
+- **Same seat**: everyone returns to their own seat.
+- **The way back** from the stage's right exit to the upper right corner is
+  **hidden**: it runs backstage, under the stage and below the audience
+  seating, not through the hall. In graphics the graduate disappears at the
+  stage's right exit and reappears at the upper right corner of the student
+  floor.
