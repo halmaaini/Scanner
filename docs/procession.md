@@ -53,3 +53,12 @@ Answers (owner):
 
 Stage Right forms as two lines too. The owner will explain how they are split
 (there is a particular arrangement); details to follow.
+
+The problem it solves: graduates enter each row from the middle aisle. On
+Stage Left the aisle end is the highest number (seat 9), so the far end is
+seat 1 and a line in seat order (1, 2, 3, …) fills the row without anyone
+passing anyone. On Stage Right the aisle end is the lowest number (seat 10)
+and the far end is seat 18, so a line in seat order would put seat 10 in front:
+they would sit first, at the aisle, and block the rest of the row. Today's
+animation assumes the Stage Right line stands in reverse order (A18 first);
+the real arrangement replaces that.
