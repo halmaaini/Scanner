@@ -79,3 +79,37 @@ Split (owner: the same as Stage Left, rows A–G then H onwards):
   (**R10** on a full hall; 80 seats on today's plan).
 - As on Stage Left, Line 2 follows straight after Line 1, and the split is by
   seat.
+
+### 3. Certificate handover (after everyone is seated)
+
+Names are called in seat order, row by row, **across the whole row**: A1, A2,
+…, A18, then B1, …, B18, and so on to the back. For each graduate:
+
+1. **Leave the seat** and go backstage, always from the **left** side this time
+   (both Stage Left and Stage Right graduates).
+2. **Called one by one**: walk across the stage from left to right as the name
+   is called, and receive the certificate.
+3. **Leave the stage** by the backstage **right** side.
+4. **Come back** round the right-hand side of the hall and re-enter the seating
+   area at its **upper right corner**.
+5. **Back to the seat**:
+   - **Stage Left** (SL) crosses the top and comes down the middle, past the
+     pool, and enters the row from the aisle end.
+   - **Stage Right** (SR) comes down the right-hand side and enters the row
+     from the outer end.
+
+Observation: the return order fills each row from the far end without anyone
+passing anyone. SL comes back A1, A2, …, A9 into the aisle end, so A1 (first
+back) walks to the far end, seat 1. SR comes back A10, A11, …, A18 into the
+outer end, so A10 (first back) walks to the far end, seat 10.
+
+Open questions:
+
+- Leaving the seats: does the Stage Right half of a row (A10–A18) also leave by
+  the left, walking across the front of the hall, or by its own side and round
+  to the left backstage?
+- When does each row get up: the whole row together when the row before it has
+  been called, or a few rows queue backstage at the same time?
+- Do they always return to the same seat? (Assumed yes.)
+- Step 4: is the walk back from the stage's right exit to the upper right
+  corner outside the student floor (between the floor and the audience)?
