@@ -71,4 +71,11 @@ holds: highest number first (F9, F8, F7, F6, F5). This is the order the
 animation already uses, so it matches; "Your place in the line" counts this
 order too.
 
-Still to settle: where Stage Right splits into its two lines.
+Split (owner: the same as Stage Left, rows A–G then H onwards):
+
+- **Line 1**: rows A–G, flipped: from **A18** to **G5** (46 seats on today's
+  plan).
+- **Line 2**: rows H–R, flipped: from **H8** to the last person on Stage Right
+  (**R10** on a full hall; 80 seats on today's plan).
+- As on Stage Left, Line 2 follows straight after Line 1, and the split is by
+  seat.
