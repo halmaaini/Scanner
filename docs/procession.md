@@ -62,3 +62,13 @@ and the far end is seat 18, so a line in seat order would put seat 10 in front:
 they would sit first, at the aisle, and block the rest of the row. Today's
 animation assumes the Stage Right line stands in reverse order (A18 first);
 the real arrangement replaces that.
+
+**The trick (owner):** behind the stage, Stage Right is flipped row by row:
+each row starts with its **highest** seat number. The line goes row A first,
+then B, and so on, and within each row from the far end towards the aisle:
+A18, A17, …, A10, then B18, …, B10, and so on. In the narrow rows (D–K) the same
+holds: highest number first (F9, F8, F7, F6, F5). This is the order the
+animation already uses, so it matches; "Your place in the line" counts this
+order too.
+
+Still to settle: where Stage Right splits into its two lines.
