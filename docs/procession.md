@@ -40,11 +40,16 @@ forms as two lines:
 - **Line 2**: from seat **H1** to the last person on Stage Left.
 
 On today's plan Line 1 covers rows A–G of Stage Left (45 seats) and Line 2
-rows H–R (81 seats). Stage Right stays one line.
+rows H–R (81 seats).
 
-Open questions:
+Answers (owner):
 
-- Does Line 2 follow straight after Line 1 (one long walk, same route), or do
-  the two lines walk in at the same time?
-- Is the split fixed by seat (always A1–G4 / H1 onwards), even if seats are
-  reassigned later?
+- Line 2 walks in **after** Line 1, one after the other (one continuous walk,
+  same route).
+- The split is fixed by seat (A1–G4, then H1 onwards). For now this holds even
+  if seats are reassigned; revisit if the seating changes.
+
+### 2. Stage Right also forms as two lines
+
+Stage Right forms as two lines too. The owner will explain how they are split
+(there is a particular arrangement); details to follow.
